@@ -1,4 +1,6 @@
-def iou(box1, box2):
+import numpy as np
+
+def IoU(box1, box2):
     """
     Compute Intersection Over Union (IoU) between two bounding boxes
     in (x_center, y_center, w, h) format.
@@ -37,3 +39,31 @@ def iou(box1, box2):
     if union_area == 0:
         return 0.0
     return inter_area / union_area
+
+def get_labels(annotations, ROIs, threshold):
+    """
+    For each ROI, find the ground truth box with the highest IoU.
+    Assign label 1 if IoU > threshold, else 0.
+    Returns arrays of labels and corresponding ground truth bboxes.
+    """
+    num_rois = len(ROIs)
+    labels = np.zeros(num_rois, dtype=int)
+    bboxes = np.zeros((num_rois, 4), dtype=float)
+
+    # Precompute ground truth boxes for efficiency
+    gt_boxes = np.stack([
+        annotations['x_center'],
+        annotations['y_center'],
+        annotations['width'],
+        annotations['height']
+    ], axis=1)
+
+    for i, roi in enumerate(ROIs):
+        # Compute IoU for all ground truth boxes with current ROI
+        ious = np.array([IoU(gt_box, roi) for gt_box in gt_boxes])
+        max_idx = np.argmax(ious)
+        max_iou = ious[max_idx]
+        labels[i] = int(max_iou > threshold)
+        bboxes[i] = gt_boxes[max_idx]
+
+    return labels, bboxes
