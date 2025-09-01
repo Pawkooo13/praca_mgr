@@ -11,11 +11,17 @@ from paths import (
 def load_data(images_dir, annotations_file):
     """ 
     Load images and annotations from the specified directories and files.
+    Returns arrays of images and corresponding bounding boxes.
     """
     annotations = pd.read_csv(annotations_file)
-    image_files = set(os.listdir(images_dir))
+    # Remove file extension from image names for consistency (skimmia dataset)
+    if 'skimmia' in annotations_file:
+        annotations['image'] = annotations['image'].str[:-4]
+
+    image_files = set(os.listdir(images_dir)[:2])
 
     images = []
+    bboxes = []
 
     for image in image_files:
         image_path = os.path.join(images_dir, image)
@@ -26,14 +32,19 @@ def load_data(images_dir, annotations_file):
             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
             images.append(img)
 
-    return images, annotations
+            img_name = image[:-4] # remove .jpg extension
+            img_annotations = annotations.query("`image` == @img_name")
+            img_bboxes = img_annotations[['x_center', 'y_center', 'width', 'height']].values.tolist()
+            bboxes.append(img_bboxes)
+
+    return np.array(images), np.array(bboxes)
 
 def main():
     skimmia_images, skimmia_annotations = load_data(SKIMMIA_IMAGES_TRAIN, SKIMMIA_ANNOTATIONS_TRAIN)
     visem_images, visem_annotations = load_data(VISEM_IMAGES_TRAIN, VISEM_ANNOTATIONS_TRAIN)
 
-    print(f"Loaded {len(skimmia_images)} training images and {skimmia_annotations.shape[0]} annotations from Skimmia dataset.") 
-    print(f"Loaded {len(visem_images)} training images and {visem_annotations.shape[0]} annotations from Visem dataset.")
+    print(f"Loaded {skimmia_images.shape[0]} training images and {skimmia_annotations.shape[0]} annotations from Skimmia dataset.") 
+    print(f"Loaded {visem_images.shape[0]} training images and {visem_annotations.shape[0]} annotations from Visem dataset.")
 
 if __name__ == '__main__':
     main()
