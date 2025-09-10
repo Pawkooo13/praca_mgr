@@ -6,7 +6,11 @@ from hog import HOG_Detector
 
 from paths import (
     SKIMMIA_IMAGES_TRAIN, SKIMMIA_ANNOTATIONS_TRAIN,
+    SKIMMIA_IMAGES_VALID, SKIMMIA_ANNOTATIONS_VALID,
+    SKIMMIA_IMAGES_TEST, SKIMMIA_ANNOTATIONS_TEST,
     VISEM_IMAGES_TRAIN, VISEM_ANNOTATIONS_TRAIN,
+    VISEM_IMAGES_VALID, VISEM_ANNOTATIONS_VALID,
+    VISEM_IMAGES_TEST, VISEM_ANNOTATIONS_TEST
 )
 
 def load_data(images_dir, annotations_file):
@@ -19,7 +23,7 @@ def load_data(images_dir, annotations_file):
     if 'skimmia' in annotations_file:
         annotations['image'] = annotations['image'].str[:-4]
 
-    image_files = set(os.listdir(images_dir)[:2])
+    image_files = set(os.listdir(images_dir)[:100])
 
     images = []
     bboxes = []
@@ -41,13 +45,28 @@ def load_data(images_dir, annotations_file):
     return np.array(images), np.array(bboxes)
 
 def main():
-    skimmia_images, skimmia_annotations = load_data(SKIMMIA_IMAGES_TRAIN, SKIMMIA_ANNOTATIONS_TRAIN)
-    visem_images, visem_annotations = load_data(VISEM_IMAGES_TRAIN, VISEM_ANNOTATIONS_TRAIN)
 
-    print(f"Loaded {skimmia_images.shape[0]} training images and {skimmia_annotations.shape[0]} annotations from Skimmia dataset.") 
-    print(f"Loaded {visem_images.shape[0]} training images and {visem_annotations.shape[0]} annotations from Visem dataset.")
+    print("Loading skimmia data... \n")
+
+    skimmia_images_train, skimmia_annotations_train = load_data(SKIMMIA_IMAGES_TRAIN, SKIMMIA_ANNOTATIONS_TRAIN)
+    skimmia_images_valid, skimmia_annotations_valid = load_data(SKIMMIA_IMAGES_VALID, SKIMMIA_ANNOTATIONS_VALID)
+    skimmia_images_test, skimmia_annotations_test = load_data(SKIMMIA_IMAGES_TEST, SKIMMIA_ANNOTATIONS_TEST)
+
+    #print("Loading visem data... \n")
+    #visem_images_train, visem_annotations_train = load_data(VISEM_IMAGES_TRAIN, VISEM_ANNOTATIONS_TRAIN)
+    #visem_images_valid, visem_annotations_valid = load_data(VISEM_IMAGES_VALID, VISEM_ANNOTATIONS_VALID)
+    #visem_images_test, visem_annotations_test = load_data(VISEM_IMAGES_TEST, VISEM_ANNOTATIONS_TEST)
+
+    print(f"Loaded {skimmia_images_train.shape[0]} training images and {skimmia_annotations_train.shape[0]} annotations from Skimmia dataset.") 
+    #print(f"Loaded {visem_images_train.shape[0]} training images and {visem_annotations_train.shape[0]} annotations from Visem dataset.")
 
     hog_detector = HOG_Detector()
+    hog_detector.train(images=skimmia_images_train, 
+                       annotations=skimmia_annotations_train)
+    
+    hog_detector.evaluate(images=skimmia_images_valid, 
+                          annotations=skimmia_annotations_valid)
+    '''
     for img, bboxes in zip(skimmia_images, skimmia_annotations):
 
         hog_features = hog_detector.extract_hog(img)
@@ -72,6 +91,7 @@ def main():
     
     cv2.imshow('Image with bboxes', img)
     cv2.waitKey(0)
+    '''
 
 if __name__ == '__main__':
     main()
