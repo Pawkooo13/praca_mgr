@@ -86,8 +86,8 @@ class HOG_Detector:
                 # Extract coordinates
                 width = self.window_size[0] 
                 height = self.window_size[1]
-                x_center = (j+1) * width//2 
-                y_center = (i+1) * height//2
+                x_center = (j+1) * width/2 
+                y_center = (i+1) * height/2
 
                 bboxes.append([x_center, y_center, width, height])
                 features.append(feature_vector)
@@ -104,24 +104,51 @@ class HOG_Detector:
         bboxes = np.zeros((num_rois, 4), dtype=float)
 
         for i, roi in enumerate(rois):
-            max_iou = 0
-            max_idx = -1
-            
-            for j, gt_box in enumerate(gt_bboxes):
-                iou = IoU(box1=gt_box, 
-                          box2=roi)
-                if iou > max_iou:
-                    max_iou = iou
-                    max_idx = j
-            
-            ious[i] = max_iou
-            
-            if max_idx != -1:
+            ious_with_gt = [IoU(gt_box, roi) for gt_box in gt_bboxes]
+            if ious_with_gt:
+                max_idx = np.argmax(ious_with_gt)
+                ious[i] = ious_with_gt[max_idx]
                 bboxes[i] = gt_bboxes[max_idx]
 
         return ious, bboxes
 
-    def extract_training_data(self, images, annotations, max_neg_samples=1000):
+    def zoom_image(self, image, zoom_factor):
+        """
+        Digital zoom on the image with given zoom factor. 
+        Returns zoomed image of the same size.
+        
+        zoom_factor > 1.0 -> zoom in (crop + resize)
+        zoom_factor < 1.0 -> zoom out (padding + resize)
+        zoom_factor = 1.0 -> no changes
+        """
+        h, w = image.shape[:2]
+
+        if zoom_factor > 1:  # zoom in
+            new_w, new_h = int(w / zoom_factor), int(h / zoom_factor)
+            x1 = (w - new_w) // 2
+            y1 = (h - new_h) // 2
+            cropped = image[y1:y1+new_h, x1:x1+new_w]
+            zoomed = cv2.resize(cropped, (w, h), interpolation=cv2.INTER_CUBIC)
+
+        elif zoom_factor < 1:  # zoom out
+            new_w, new_h = int(w * zoom_factor), int(h * zoom_factor)
+            resized = cv2.resize(image, (new_w, new_h), interpolation=cv2.INTER_CUBIC)
+
+            # padding
+            top = (h - new_h) // 2
+            bottom = h - new_h - top
+            left = (w - new_w) // 2
+            right = w - new_w - left
+            zoomed = cv2.copyMakeBorder(resized, top, bottom, left, right,
+                                        borderType=cv2.BORDER_CONSTANT,
+                                        value=[0, 0, 0])
+
+        else:
+            zoomed = image.copy()
+
+        return zoomed
+
+    def extract_data(self, images, annotations, max_neg_samples=1000):
         """
         Extract HOG features and corresponding labels from images and annotations.
         """
@@ -129,22 +156,59 @@ class HOG_Detector:
         Y_data = []
         neg_samples_cnt = 0
 
-        for img, gt_bboxes in tqdm(zip(images, annotations), desc="Extracting training data", total=len(images)):
-            hog_features = self.extract_hog(img)
-            feature_vectors, rois = self.sliding_window(hog_features)
+        for img, gt_bboxes in tqdm(zip(images, annotations), desc="Extracting data", total=len(images)):
+            
+            selected_rois = []
+            # to avoid issues with empty annotations and ensure correct shape
+            gt_bboxes = np.array(gt_bboxes, dtype=float).reshape(-1, 4)
 
-            # Compute IoU with ground truth boxes
-            ious, matched_bboxes = self.get_IoUs(gt_bboxes=gt_bboxes, 
-                                                 rois=rois)
+            # Multi-scale approach
+            for window_size in [(32,32), (64,64), (96,96), (128,128)]:
+                zoom_factor = self.window_size[0] / window_size[0]
 
-            for idx, iou in enumerate(ious):
-                if iou >= 0.4:
-                    Y_data.append(1)
-                    X_data.append(feature_vectors[idx])
-                elif iou <= 0.2 and neg_samples_cnt < max_neg_samples:
-                    Y_data.append(0)
-                    X_data.append(feature_vectors[idx])
-                    neg_samples_cnt += 1
+                zoomed_img = self.zoom_image(img, zoom_factor)
+
+                scaled_bboxes = gt_bboxes.copy()
+                H_orig, W_orig = img.shape[:2]
+                H_crop, W_crop = img.shape[:2]
+
+                # scaling bboxes to zoomed image
+                scaled_bboxes = np.multiply(scaled_bboxes, zoom_factor)
+
+                # offset crop
+                x_offset = (W_orig * zoom_factor - W_crop) / 2
+                y_offset = (H_orig * zoom_factor - H_crop) / 2
+                scaled_bboxes[:, 0] -= x_offset
+                scaled_bboxes[:, 1] -= y_offset
+
+                # clip bboxes to image boundaries
+                scaled_bboxes[:, 0] = np.clip(scaled_bboxes[:, 0], 0, W_crop)
+                scaled_bboxes[:, 1] = np.clip(scaled_bboxes[:, 1], 0, H_crop)
+
+                hog_features = self.extract_hog(zoomed_img)
+                feature_vectors, rois = self.sliding_window(hog_features)
+
+                ious, matched_bboxes = self.get_IoUs(gt_bboxes=scaled_bboxes, 
+                                                     rois=rois)
+
+                for idx, iou in enumerate(ious):
+                    if iou >= 0.4:
+                        Y_data.append(1)
+                        X_data.append(feature_vectors[idx])
+
+                        # Rescale bbox coordinates back to original image size
+                        rescaled_bbox = rois[idx].copy()
+                        rescaled_bbox[0] = (rescaled_bbox[0] + x_offset) / zoom_factor
+                        rescaled_bbox[1] = (rescaled_bbox[1] + y_offset) / zoom_factor
+                        rescaled_bbox[2] = rescaled_bbox[2] / zoom_factor
+                        rescaled_bbox[3] = rescaled_bbox[3] / zoom_factor
+
+                        selected_rois.append(rescaled_bbox)
+
+                    elif iou <= 0.2 and neg_samples_cnt < max_neg_samples:
+                        Y_data.append(0)
+                        X_data.append(feature_vectors[idx])
+                        neg_samples_cnt += 1
 
         return np.array(X_data), np.array(Y_data)
 
@@ -152,7 +216,7 @@ class HOG_Detector:
         """
         Train a classifier using HOG features extracted from images and bounding boxes.
         """
-        X_train, Y_train = self.extract_training_data(images, annotations)
+        X_train, Y_train = self.extract_data(images, annotations)
 
         # Standardize features
         scaler = StandardScaler()
@@ -176,14 +240,14 @@ class HOG_Detector:
 
         print("Model trained and saved as 'models/hog_svm_model.pkl'")
         print(f"Training completed. Evaluation on training data: {train_accuracy:.2f}% accuracy")
-
+        
     def evaluate(self, images, annotations):
         """
         Evaluate the trained model on a validation set.
         """
         model = pickle.load(open('models/hog_svm_model.pkl', 'rb'))
 
-        X_val, Y_val = self.extract_training_data(images, annotations)
+        X_val, Y_val = self.extract_data(images, annotations)
 
         # Standardize features
         scaler = pickle.load(open('models/hog_scaler.pkl', 'rb'))
@@ -210,11 +274,14 @@ class HOG_Detector:
             feature_vectors = scaler.transform(feature_vectors)
             
             # Predict using the trained model
-            predictions = model.predict(feature_vectors)
-            idxs = np.where(predictions == 1)
+            predictions = model.predict_proba(feature_vectors)
+            predictions = predictions[:, 1]  # Probability of positive class
+            idxs = np.where(predictions >= 0.5)
 
             selected_bboxes = bboxes[idxs]
             results.append(selected_bboxes)
+
+            # NMS ...
 
         # Plot 5 random images with detected boxes
         fig, ax = plt.subplots(1, 5, figsize=(20, 10))

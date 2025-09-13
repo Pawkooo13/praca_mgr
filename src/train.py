@@ -66,6 +66,8 @@ def main():
     
     hog_detector.evaluate(images=skimmia_images_valid, 
                           annotations=skimmia_annotations_valid)
+    
+    #hog_detector.predict(images=skimmia_images_test)
     '''
     for img, bboxes in zip(skimmia_images, skimmia_annotations):
 
