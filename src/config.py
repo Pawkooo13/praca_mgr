@@ -1,4 +1,7 @@
 import numpy as np
+import matplotlib.pyplot as plt
+import cv2
+import os
 
 def IoU(box1, box2):
     """
@@ -67,3 +70,24 @@ def get_labels(annotations, ROIs, threshold):
         bboxes[i] = gt_boxes[max_idx]
 
     return labels, bboxes
+
+def plot_predictions(images, bboxes, name):
+    """
+    Plot given bboxes on given images and save in plots directory.
+    """
+    fig, ax = plt.subplots(1, len(images), figsize=(20, 10))
+    
+    for i, image in enumerate(images):
+        
+        for box in bboxes[i]:
+            x_center, y_center, width, height = box
+            top_left = (int(x_center - width/2), int(y_center - height/2))
+            bottom_right = (int(x_center + width/2), int(y_center + height/2))
+            cv2.rectangle(image, top_left, bottom_right, (255, 0, 0), 2)
+
+        ax[i].imshow(image)
+        ax[i].axis('off')
+
+    save_path = os.path.join('plots/', str(name + '.png'))
+    plt.savefig(save_path)
+    plt.show()
