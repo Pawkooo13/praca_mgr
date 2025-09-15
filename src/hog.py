@@ -97,6 +97,11 @@ class HOG_Detector:
     def get_IoUs(self, gt_bboxes, rois):
         """
         For each ROI, find the ground truth box with the highest IoU.
+
+        Args:
+            gt_bboxes: ground truth bounding boxes
+            rois: regions of interest extracted from sliding window
+
         Returns arrays of max IoUs and corresponding ground truth bboxes.
         """
         num_rois = len(rois)
@@ -115,11 +120,16 @@ class HOG_Detector:
     def zoom_image(self, image, zoom_factor):
         """
         Digital zoom on the image with given zoom factor. 
-        Returns zoomed image of the same size.
         
         zoom_factor > 1.0 -> zoom in (crop + resize)
         zoom_factor < 1.0 -> zoom out (padding + resize)
         zoom_factor = 1.0 -> no changes
+
+        Args:
+            image - image
+            zoom_factor - zooming factor
+
+        Returns zoomed image of the same size.
         """
         h, w = image.shape[:2]
 
@@ -147,10 +157,79 @@ class HOG_Detector:
             zoomed = image.copy()
 
         return zoomed
+    
+    def scale_bboxes(self, image_size, bboxes, scale_factor):
+        """
+        Scale bounding boxes according to the zoom factor applied to the image.
 
-    def extract_data(self, images, annotations, max_neg_samples=1000):
+        Args:
+            image_size - tuple of image size
+            bboxes - bounding boxes (gt_bboxes / rois) to be scaled
+            scale_factor - zooming factor used in zoom_image function
+
+        Returns scaled bounding boxes clipped to image boundaries.
+        """
+        scaled_bboxes = bboxes.copy()
+
+        H_orig, W_orig = image_size[:2]
+        H_crop, W_crop = image_size[:2]
+
+        # scaling bboxes to zoomed image
+        scaled_bboxes = np.multiply(bboxes, scale_factor)
+
+        # offset crop
+        x_offset = (W_orig * scale_factor - W_crop) / 2
+        y_offset = (H_orig * scale_factor - H_crop) / 2
+        scaled_bboxes[:, 0] -= x_offset
+        scaled_bboxes[:, 1] -= y_offset
+
+        # clip bboxes to image boundaries
+        scaled_bboxes[:, 0] = np.clip(scaled_bboxes[:, 0], 0, W_crop)
+        scaled_bboxes[:, 1] = np.clip(scaled_bboxes[:, 1], 0, H_crop)
+
+        return scaled_bboxes
+    
+    def rescale_bboxes(self, image_size, bboxes, scale_factor):
+        """
+        Rescale bounding boxes back to the original image size.
+
+        Args:
+            image_size - tuple of image size
+            bboxes - bounding boxes (gt_bboxes / rois) to be scaled
+            scale_factor - zooming factor used in zoom_image function
+
+        Returns rescaled bounding boxes.
+        """
+        rescaled_bboxes = bboxes.copy()    
+
+        H_orig, W_orig = image_size[:2]
+        H_crop, W_crop = image_size[:2]
+
+        # rescaling bbox to original image size
+        x_offset = (W_orig * scale_factor - W_crop) / 2
+        y_offset = (H_orig * scale_factor - H_crop) / 2
+
+        rescaled_bboxes[:, 0] = (rescaled_bboxes[:, 0] + x_offset) / scale_factor
+        rescaled_bboxes[:, 1] = (rescaled_bboxes[:, 1] + y_offset) / scale_factor
+        rescaled_bboxes[:, 2] = rescaled_bboxes[:, 2] / scale_factor
+        rescaled_bboxes[:, 3] = rescaled_bboxes[:, 3] / scale_factor
+
+        # clip bboxes to image boundaries
+        rescaled_bboxes[:, 0] = np.clip(rescaled_bboxes[:, 0], 0, W_crop)
+        rescaled_bboxes[:, 1] = np.clip(rescaled_bboxes[:, 1], 0, H_crop)
+
+        return rescaled_bboxes
+
+    def extract_data(self, images, annotations, max_neg_samples=2000):
         """
         Extract HOG features and corresponding labels from images and annotations.
+
+        Args:
+            images - images used to extract feature vectors
+            annotations - annotations of ground truth bounding boxes
+            max_neg_samples - parameter used to control number of negative samples 
+
+        Returns feature vectors and labels.
         """
         X_data = []
         Y_data = []
@@ -159,7 +238,7 @@ class HOG_Detector:
         for img, gt_bboxes in tqdm(zip(images, annotations), desc="Extracting data", total=len(images)):
             
             selected_rois = []
-            # to avoid issues with empty annotations and ensure correct shape
+            # Avoid issues with empty annotations and ensure correct shape
             gt_bboxes = np.array(gt_bboxes, dtype=float).reshape(-1, 4)
 
             # Multi-scale approach
@@ -167,24 +246,11 @@ class HOG_Detector:
                 zoom_factor = self.window_size[0] / window_size[0]
 
                 zoomed_img = self.zoom_image(img, zoom_factor)
+                scaled_bboxes = self.scale_bboxes(image_size=img.shape,
+                                                  bboxes=gt_bboxes,
+                                                  scale_factor=zoom_factor)
 
-                scaled_bboxes = gt_bboxes.copy()
-                H_orig, W_orig = img.shape[:2]
-                H_crop, W_crop = img.shape[:2]
-
-                # scaling bboxes to zoomed image
-                scaled_bboxes = np.multiply(scaled_bboxes, zoom_factor)
-
-                # offset crop
-                x_offset = (W_orig * zoom_factor - W_crop) / 2
-                y_offset = (H_orig * zoom_factor - H_crop) / 2
-                scaled_bboxes[:, 0] -= x_offset
-                scaled_bboxes[:, 1] -= y_offset
-
-                # clip bboxes to image boundaries
-                scaled_bboxes[:, 0] = np.clip(scaled_bboxes[:, 0], 0, W_crop)
-                scaled_bboxes[:, 1] = np.clip(scaled_bboxes[:, 1], 0, H_crop)
-
+                # Extract HOG features
                 hog_features = self.extract_hog(zoomed_img)
                 feature_vectors, rois = self.sliding_window(hog_features)
 
@@ -195,15 +261,12 @@ class HOG_Detector:
                     if iou >= 0.4:
                         Y_data.append(1)
                         X_data.append(feature_vectors[idx])
-
+                        bbox = rois[idx].reshape(-1, 4)
                         # Rescale bbox coordinates back to original image size
-                        rescaled_bbox = rois[idx].copy()
-                        rescaled_bbox[0] = (rescaled_bbox[0] + x_offset) / zoom_factor
-                        rescaled_bbox[1] = (rescaled_bbox[1] + y_offset) / zoom_factor
-                        rescaled_bbox[2] = rescaled_bbox[2] / zoom_factor
-                        rescaled_bbox[3] = rescaled_bbox[3] / zoom_factor
-
-                        selected_rois.append(rescaled_bbox)
+                        rescaled_bbox = self.rescale_bboxes(image_size=img.shape,
+                                                            bboxes=bbox,
+                                                            scale_factor=zoom_factor)
+                        selected_rois.append(rescaled_bbox.ravel())
 
                     elif iou <= 0.2 and neg_samples_cnt < max_neg_samples:
                         Y_data.append(0)
@@ -215,6 +278,12 @@ class HOG_Detector:
     def train(self, images, annotations):
         """
         Train a classifier using HOG features extracted from images and bounding boxes.
+
+        Args:
+            images - images used to train model
+            annotations - ground truth bounding boxes
+
+        Saving model as hog_svm_model.pkl in models directory.
         """
         X_train, Y_train = self.extract_data(images, annotations)
 
@@ -244,59 +313,75 @@ class HOG_Detector:
     def evaluate(self, images, annotations):
         """
         Evaluate the trained model on a validation set.
+
+        Args:
+            images - images used to create validation set
+            annotations - ground truth bounding boxes
+
+        Printing evaluation score.
         """
+
+        print('Evaluating model...')
+
         model = pickle.load(open('models/hog_svm_model.pkl', 'rb'))
 
-        X_val, Y_val = self.extract_data(images, annotations)
+        X_val, Y_val, selected_bboxes = self.extract_data(images, annotations)
 
         # Standardize features
         scaler = pickle.load(open('models/hog_scaler.pkl', 'rb'))
         X_val = scaler.transform(X_val)
 
         val_accuracy = model.score(X_val, Y_val) * 100
-        print(f"Validation accuracy: {val_accuracy:.2f}%")
+        print(f"Evaluation accuracy: {val_accuracy:.2f}%")
 
-    def predict(self, images):
+    def predict(self, images, threshold):
         """
         Predict bounding boxes in the given images.
+
+        Args:
+            images - images
+            threshold - threshold used to control accuracy % of prediction
+
+        Returns bounding boxes that conatins object.
         """
+
+        print('Predicting on test images...')
+
+        scaler = pickle.load(open('models/hog_scaler.pkl', 'rb'))
         model = pickle.load(open('models/hog_svm_model.pkl', 'rb'))
 
         results = []
 
-        for img in images:
-            # Extract HOG features and sliding window
-            hog_features = self.extract_hog(img)
-            feature_vectors, bboxes = self.sliding_window(hog_features)
+        for img in tqdm(images, desc="Predicting", total=len(images)):
+            img_features = []
+            img_bboxes = []
+
+            for window_size in [(32,32), (64,64), (96,96), (128,128)]:
+                zoom_factor = self.window_size[0] / window_size[0]
+                zoomed_img = self.zoom_image(img, zoom_factor)
+                
+                # Extract HOG features
+                hog_features = self.extract_hog(zoomed_img)
+                feature_vectors, bboxes = self.sliding_window(hog_features)
+
+                transformed_bboxes = self.rescale_bboxes(image_size=img.shape,
+                                                         bboxes=bboxes,
+                                                         scale_factor=zoom_factor)
+
+                img_features.append(feature_vectors)
+                img_bboxes.append(transformed_bboxes)
+
+            stacked_features = np.vstack(img_features)
+            stacked_bboxes = np.vstack(img_bboxes)
 
             # Standardize features
-            scaler = pickle.load(open('models/hog_scaler.pkl', 'rb'))
-            feature_vectors = scaler.transform(feature_vectors)
-            
+            feature_vectors = scaler.transform(stacked_features)
+                
             # Predict using the trained model
-            predictions = model.predict_proba(feature_vectors)
-            predictions = predictions[:, 1]  # Probability of positive class
-            idxs = np.where(predictions >= 0.5)
+            predictions = model.predict_proba(feature_vectors)[:, 1] # Probability of positive class
+            idxs = np.where(predictions >= threshold)[0]
 
-            selected_bboxes = bboxes[idxs]
+            selected_bboxes = stacked_bboxes[idxs]
             results.append(selected_bboxes)
-
-            # NMS ...
-
-        # Plot 5 random images with detected boxes
-        fig, ax = plt.subplots(1, 5, figsize=(20, 10))
-        random_indices = np.random.choice(len(images), size=5, replace=False)
-        for i, idx in enumerate(random_indices):
-            img = images[idx].copy()
-            for box in results[idx]:
-                x_center, y_center, width, height = box
-                top_left = (int(x_center - width/2), int(y_center - height/2))
-                bottom_right = (int(x_center + width/2), int(y_center + height/2))
-                cv2.rectangle(img, top_left, bottom_right, (255, 0, 0), 2)
-            ax[i].imshow(img)
-            ax[i].axis('off')
-        
-        plt.savefig('plots/hog_detections.png')
-        plt.show()
 
         return results

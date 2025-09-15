@@ -1,6 +1,7 @@
 import os
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
 import cv2
 from hog import HOG_Detector
 
@@ -67,33 +68,8 @@ def main():
     hog_detector.evaluate(images=skimmia_images_valid, 
                           annotations=skimmia_annotations_valid)
     
-    #hog_detector.predict(images=skimmia_images_test)
-    '''
-    for img, bboxes in zip(skimmia_images, skimmia_annotations):
-
-        hog_features = hog_detector.extract_hog(img)
-        print(hog_features.shape)
-
-        feature_vectors, bboxes = hog_detector.sliding_window(hog_features)
-        print(feature_vectors.shape)
-        print(bboxes.shape)
-        print(bboxes)
-
-    #plot bboxes on image
-    img = skimmia_images[0].copy()
-    bboxes = skimmia_annotations[0]
-
-    for bbox in bboxes:
-        x_center, y_center, width, height = bbox
-        x1 = int(x_center - width / 2)
-        y1 = int(y_center - height / 2)
-        x2 = int(x_center + width / 2)
-        y2 = int(y_center + height / 2)
-        cv2.rectangle(img, (x1, y1), (x2, y2), (255, 0, 0), 2)
-    
-    cv2.imshow('Image with bboxes', img)
-    cv2.waitKey(0)
-    '''
+    hog_detector.predict(images=skimmia_images_test,
+                         threshold=0.9)
 
 if __name__ == '__main__':
     main()
