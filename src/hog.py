@@ -350,7 +350,8 @@ class HOG_Detector:
         scaler = pickle.load(open('models/hog_scaler.pkl', 'rb'))
         model = pickle.load(open('models/hog_svm_model.pkl', 'rb'))
 
-        results = []
+        final_bboxes = []
+        final_scores = []
 
         for img in tqdm(images, desc="Predicting", total=len(images)):
             img_features = []
@@ -382,6 +383,9 @@ class HOG_Detector:
             idxs = np.where(predictions >= threshold)[0]
 
             selected_bboxes = stacked_bboxes[idxs]
-            results.append(selected_bboxes)
+            selected_scores = predictions[idxs]
+    
+            final_bboxes.append(selected_bboxes)
+            final_scores.append(selected_scores)
 
-        return np.array(results), np.array(predictions)
+        return np.array(final_bboxes), np.array(final_scores)

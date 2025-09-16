@@ -4,7 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import cv2
 from hog import HOG_Detector
-from processing import preprocess
+from processing import preprocess, NMS
 from config import plot_predictions
 
 from paths import (
@@ -26,7 +26,7 @@ def load_data(images_dir, annotations_file):
     if 'skimmia' in annotations_file:
         annotations['image'] = annotations['image'].str[:-4]
 
-    image_files = set(os.listdir(images_dir)[:100])
+    image_files = set(os.listdir(images_dir)[:10])
 
     images = []
     bboxes = []
@@ -74,14 +74,20 @@ def main():
     hog_detector.evaluate(images=preprocessed_skimmia_images_valid, 
                           annotations=skimmia_annotations_valid)
     
-    predictions = hog_detector.predict(images=skimmia_images_test,
-                                       threshold=0.8)
+    pred_bboxes, pred_scores = hog_detector.predict(images=skimmia_images_test,
+                                                    threshold=0.8)
     
     idxs = np.random.choice(len(preprocessed_skimmia_images_test), size=5, replace=False)
     images = preprocessed_skimmia_images_test[idxs]
-    bboxes = predictions[idxs]
+    
+    bboxes = pred_bboxes[idxs]
+    scores = pred_scores[idxs]
+
+    selected_bboxes = [NMS(bboxes=img_bboxes, scores=img_scores, iou_threshold=0.2) 
+                       for img_bboxes, img_scores in zip(bboxes, scores)]
+
     plot_predictions(images=images,
-                     bboxes=bboxes,
+                     bboxes=selected_bboxes,
                      name='hog_preprocessed_images_predictions')
 
 if __name__ == '__main__':
