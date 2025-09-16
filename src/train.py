@@ -4,6 +4,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import cv2
 from hog import HOG_Detector
+from processing import preprocess
+from config import plot_predictions
 
 from paths import (
     SKIMMIA_IMAGES_TRAIN, SKIMMIA_ANNOTATIONS_TRAIN,
@@ -61,15 +63,26 @@ def main():
     print(f"Loaded {skimmia_images_train.shape[0]} training images and {skimmia_annotations_train.shape[0]} annotations from Skimmia dataset.") 
     #print(f"Loaded {visem_images_train.shape[0]} training images and {visem_annotations_train.shape[0]} annotations from Visem dataset.")
 
+    preprocessed_skimmia_images_train = np.array([preprocess(image) for image in skimmia_images_train])
+    preprocessed_skimmia_images_valid = np.array([preprocess(image) for image in skimmia_images_valid])
+    preprocessed_skimmia_images_test = np.array([preprocess(image) for image in skimmia_images_test])
+
     hog_detector = HOG_Detector()
-    hog_detector.train(images=skimmia_images_train, 
+    hog_detector.train(images=preprocessed_skimmia_images_train, 
                        annotations=skimmia_annotations_train)
     
-    hog_detector.evaluate(images=skimmia_images_valid, 
+    hog_detector.evaluate(images=preprocessed_skimmia_images_valid, 
                           annotations=skimmia_annotations_valid)
     
-    hog_detector.predict(images=skimmia_images_test,
-                         threshold=0.9)
+    predictions = hog_detector.predict(images=skimmia_images_test,
+                                       threshold=0.8)
+    
+    idxs = np.random.choice(len(preprocessed_skimmia_images_test), size=5, replace=False)
+    images = preprocessed_skimmia_images_test[idxs]
+    bboxes = predictions[idxs]
+    plot_predictions(images=images,
+                     bboxes=bboxes,
+                     name='hog_preprocessed_images_predictions')
 
 if __name__ == '__main__':
     main()

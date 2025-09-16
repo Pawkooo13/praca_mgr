@@ -325,7 +325,7 @@ class HOG_Detector:
 
         model = pickle.load(open('models/hog_svm_model.pkl', 'rb'))
 
-        X_val, Y_val, selected_bboxes = self.extract_data(images, annotations)
+        X_val, Y_val = self.extract_data(images, annotations)
 
         # Standardize features
         scaler = pickle.load(open('models/hog_scaler.pkl', 'rb'))
@@ -384,4 +384,4 @@ class HOG_Detector:
             selected_bboxes = stacked_bboxes[idxs]
             results.append(selected_bboxes)
 
-        return results
+        return np.array(results), np.array(predictions)
