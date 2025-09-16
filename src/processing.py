@@ -46,7 +46,7 @@ def preprocess(image):
 
     return processed_image
 
-def NMS(bboxes, scores):
+def NMS(bboxes, scores, iou_threshold):
     """
     Applies Non-Maximum Suppression (NMS) to a set of bounding boxes and their associated scores.
 
@@ -63,7 +63,7 @@ def NMS(bboxes, scores):
     idxs_of_selected_bboxes = tf.image.non_max_suppression(boxes=converted_bboxes,
                                                            scores=scores,
                                                            max_output_size=len(bboxes),
-                                                           iou_threshold=0.2)
+                                                           iou_threshold=iou_threshold)
     
     selected_bboxes = [bboxes[idx] for idx in idxs_of_selected_bboxes]
 
