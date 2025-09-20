@@ -4,8 +4,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 import cv2
 from hog import HOG_Detector
+from rcnn import RCNN
 from processing import preprocess, NMS
 from config import plot_predictions
+import tensorflow as tf
+import warnings
 
 from paths import (
     SKIMMIA_IMAGES_TRAIN, SKIMMIA_ANNOTATIONS_TRAIN,
@@ -26,7 +29,7 @@ def load_data(images_dir, annotations_file):
     if 'skimmia' in annotations_file:
         annotations['image'] = annotations['image'].str[:-4]
 
-    image_files = set(os.listdir(images_dir)[:10])
+    image_files = set(os.listdir(images_dir)[:100])
 
     images = []
     bboxes = []
@@ -48,6 +51,8 @@ def load_data(images_dir, annotations_file):
     return np.array(images), np.array(bboxes)
 
 def main():
+    warnings.filterwarnings("ignore")
+    tf.get_logger().setLevel('ERROR')
 
     print("Loading skimmia data... \n")
 
@@ -67,6 +72,8 @@ def main():
     preprocessed_skimmia_images_valid = np.array([preprocess(image) for image in skimmia_images_valid])
     preprocessed_skimmia_images_test = np.array([preprocess(image) for image in skimmia_images_test])
 
+    '''
+    # HOG Detector 
     hog_detector = HOG_Detector()
     hog_detector.train(images=preprocessed_skimmia_images_train, 
                        annotations=skimmia_annotations_train)
@@ -89,6 +96,17 @@ def main():
     plot_predictions(images=images,
                      bboxes=selected_bboxes,
                      name='hog_preprocessed_images_predictions')
+    
+    '''
+
+    # RCNN
+    rcnn = RCNN()
+    rcnn.train(images=preprocessed_skimmia_images_train,
+               annotations=skimmia_annotations_train,
+               max_neg_samples=1000,
+               epochs=30,
+               name='rcnn')
+
 
 if __name__ == '__main__':
     main()
