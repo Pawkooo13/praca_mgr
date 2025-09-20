@@ -43,33 +43,21 @@ def IoU(box1, box2):
         return 0.0
     return inter_area / union_area
 
-def get_labels(annotations, ROIs, threshold):
+def average_IoU(gt_bboxes, pred_bboxes):
     """
-    For each ROI, find the ground truth box with the highest IoU.
-    Assign label 1 if IoU > threshold, else 0.
-    Returns arrays of labels and corresponding ground truth bboxes.
+    Compute average IoU across given ground truth bboxes and predicted bboxes for images.
     """
-    num_rois = len(ROIs)
-    labels = np.zeros(num_rois, dtype=int)
-    bboxes = np.zeros((num_rois, 4), dtype=float)
+    num_images = gt_bboxes.shape[0]
+    max_ious = []
+    for i in range(num_images):
+        gt_bboxes_per_img = gt_bboxes[i]
+        pred_bboxes_per_img = pred_bboxes[i]
 
-    # Precompute ground truth boxes for efficiency
-    gt_boxes = np.stack([
-        annotations['x_center'],
-        annotations['y_center'],
-        annotations['width'],
-        annotations['height']
-    ], axis=1)
+        for pred_bbox in pred_bboxes_per_img:
+            ious = [IoU(box1=gt_box, box2=pred_bbox) for gt_box in gt_bboxes_per_img]
+            max_ious.append(np.max(ious))
 
-    for i, roi in enumerate(ROIs):
-        # Compute IoU for all ground truth boxes with current ROI
-        ious = np.array([IoU(gt_box, roi) for gt_box in gt_boxes])
-        max_idx = np.argmax(ious)
-        max_iou = ious[max_idx]
-        labels[i] = int(max_iou > threshold)
-        bboxes[i] = gt_boxes[max_idx]
-
-    return labels, bboxes
+    return np.average(max_ious)
 
 def plot_predictions(images, bboxes, name):
     """
