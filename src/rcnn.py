@@ -22,12 +22,13 @@ from tensorflow.keras.layers import (
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.losses import BinaryCrossentropy
 from tensorflow.keras.metrics import Precision, Accuracy
+from tensorflow.keras.models import load_model
 from tqdm import tqdm
 from config import IoU
 
 class RCNN:
-    def __init__(self):
-        pass
+    def __init__(self, name):
+        self.name = name
 
     def get_ROIs(self, image):
         """
@@ -210,38 +211,89 @@ class RCNN:
 
         return model
 
-    def train(self, images, annotations, max_neg_samples, epochs, name):
+    def train(self, images, annotations, max_neg_samples, epochs):
+        """
+        Trains the RCNN model using the provided images and annotations.
+
+        Args:
+            images: List of input images for training.
+            annotations: Corresponding bounding boxes for the images.
+            max_neg_samples: Maximum number of negative samples to extract for training.
+            epochs: Number of training epochs.
+            name: Name identifier for saving the model and training history.
+
+        Returns:
+            - Prints training progress and evaluation metrics.
+            - Saves training history plot to 'plots/training_history_<name>.png'.
+            - Saves trained model to 'models/<name>.h5'.
+        """
+
         X_img, Y_img, X_bboxes, Y_bboxes = self.extract_data(images=images,
                                                              annotations=annotations,
                                                              max_neg_samples=max_neg_samples)
         
-        print(Y_img)
         print(f"Positive samples: {np.sum(Y_img==1)}, Negative samples: {np.sum(Y_img==0)} \n")
 
         print('Training model...')
         model = self.CNN()
         training_history = model.fit(x=X_img,
                                      y=Y_img,
-                                     batch_size=32,
+                                     batch_size=64,
                                      epochs=epochs,
                                      validation_split=0.3)
 
         # Save training history
         pd.DataFrame(training_history.history).plot()
-        plot_path = os.path.join('plots', 'training_history_' + str(name) + '.png')
+        plot_path = os.path.join('plots', 'training_history_' + str(self.name) + '.png')
         plt.savefig(plot_path)
 
         # Evaluate model
         loss, acc = model.evaluate(x=X_img,
                                    y=Y_img,
                                    batch_size=64)
+        ious = []
+        for x_bbox, y_bbox in zip(X_bboxes, Y_bboxes):
+            if np.all(y_bbox != 0):
+                ious.append(IoU(box1=x_bbox, box2=y_bbox))
+
+        iou = np.average(ious)
 
         # Save model
-        model_path = os.path.join('models', str(name) + '.h5')
+        model_path = os.path.join('models', str(self.name) + '.h5')
         model.save(model_path)
 
-        print(f"Training completed. Evaluation on training data: {acc * 100:.2f}% accuracy")
-        #print(f"Model saved as {model_path}")
+        print(f"Training completed. Evaluation on training data: {acc * 100:.2f}% precision, {iou:.2f} avg. IoU")
+        print(f"Model saved as {model_path}")
 
-    def predict(self):
-        pass
+    def predict(self, images, threshold):
+        """
+        Generates predictions for a list of images using a pre-trained model and a specified threshold.
+
+        Args:
+            images: List or array of input images to process.
+            threshold: Confidence threshold for filtering predictions.
+
+        Returns:
+            - final_rois: Regions of interest (ROIs) from images that meet the threshold.
+            - final_bboxes: Bounding boxes corresponding to the selected ROIs.
+            - final_scores: Prediction scores for the selected ROIs.
+        """
+
+        model = load_model(f'models/{self.name}.h5')
+
+        final_scores = []
+        final_rois = []
+        final_bboxes = []
+
+        for img in tqdm(images, desc="Predicting on test images...", total=len(images)):
+            
+            rois_imgs, rois_bboxes = self.get_ROIs(image=img) 
+
+            predictions = model.predict(rois_imgs).flatten()
+            idxs = np.where(predictions >= threshold)[0]
+
+            final_scores.append(predictions[idxs])
+            final_rois.append(rois_imgs[idxs])
+            final_bboxes.append(rois_bboxes[idxs])
+
+        return np.array(final_rois), np.array(final_bboxes), np.array(final_scores)
