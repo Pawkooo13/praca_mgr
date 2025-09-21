@@ -21,7 +21,7 @@ from tensorflow.keras.layers import (
 )
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.losses import BinaryCrossentropy
-from tensorflow.keras.metrics import Precision, Accuracy
+from tensorflow.keras.metrics import Precision
 from tensorflow.keras.models import load_model
 from tqdm import tqdm
 from config import IoU
@@ -38,8 +38,8 @@ class RCNN:
             image: The input image for which to generate region proposals.
 
         Returns:
-            rois_iamges: A list of ROI images resized to (64, 64, 3).
-            rois_coordinates: A list of ROI coordinates, where each ROI is represented as [x, y, w, h].
+            - rois_iamges: A list of ROI images resized to (64, 64, 3).
+            - rois_coordinates: A list of ROI coordinates, where each ROI is represented as [x, y, w, h].
         """
         ss = cv2.ximgproc.segmentation.createSelectiveSearchSegmentation()
         ss.setBaseImage(image)
@@ -94,10 +94,10 @@ class RCNN:
             max_neg_samples: Maximum number of negative samples to extract.
 
         Returns:
-            Array of ROI images.
-            Array of labels (1 for positive, 0 for negative).
-            Array of ROI bounding boxes.
-            Array of target bounding boxes (ground truth for positives, zeros for negatives).
+            - Array of ROI images.
+            - Array of labels (1 for positive, 0 for negative).
+            - Array of ROI bounding boxes.
+            - Array of target bounding boxes (ground truth for positives, zeros for negatives).
         """
 
         X_imgs = []
@@ -120,8 +120,7 @@ class RCNN:
                     X_imgs.append(rois_imgs[idx])
                     X_bboxes.append(rois_bboxes[idx])
                     Y_bboxes.append(matched_bboxes[idx])
-                   
-
+                
                 elif iou <= 0.2 and neg_samples_cnt < max_neg_samples:
                     Y_imgs.append([0.0])
                     X_imgs.append(rois_imgs[idx])
@@ -154,10 +153,10 @@ class RCNN:
         model = Sequential([
             Input(shape=(64, 64, 3)),
             RandomFlip(mode='horizontal_and_vertical'),
-            RandomTranslation(height_factor=0.1,
-                              width_factor=0.1),
-            RandomZoom(height_factor=0.1,
-                       width_factor=0.1),
+            RandomTranslation(height_factor=0.15,
+                              width_factor=0.15),
+            RandomZoom(height_factor=0.15,
+                       width_factor=0.15),
             Rescaling(scale=1./255,
                       offset=0.0),
             
@@ -248,22 +247,76 @@ class RCNN:
         plt.savefig(plot_path)
 
         # Evaluate model
-        loss, acc = model.evaluate(x=X_img,
-                                   y=Y_img,
-                                   batch_size=64)
+        loss, precision = model.evaluate(x=X_img,
+                                         y=Y_img,
+                                         batch_size=64)
         ious = []
         for x_bbox, y_bbox in zip(X_bboxes, Y_bboxes):
             if np.all(y_bbox != 0):
                 ious.append(IoU(box1=x_bbox, box2=y_bbox))
 
-        iou = np.average(ious)
+        avg_iou = np.average(ious)
 
         # Save model
         model_path = os.path.join('models', str(self.name) + '.h5')
         model.save(model_path)
 
-        print(f"Training completed. Evaluation on training data: {acc * 100:.2f}% precision, {iou:.2f} avg. IoU")
+        print(f"Training completed. Evaluation on training data: {precision * 100:.2f}% precision, {avg_iou:.2f} avg. IoU")
         print(f"Model saved as {model_path}")
+
+    def evaluate(self, images, annotations, pred_threshold):
+        """
+         Evaluate the trained object detection model on a given dataset.
+
+        Args:
+            images: List of input images.
+            annotations: List of ground truth bounding boxes.
+            pred_threshold: Threshold on predicted probability to consider an ROI as positive.
+
+        Print:
+            - val_precision: Classification precision of the model.
+            - avg_iou: Average IoU of predicted positive ROIs.
+        """
+        print('Evaluating model...')
+
+        X_imgs = []
+        Y_imgs = []
+        X_bboxes = []
+        Y_bboxes = []
+        IOUs = []
+
+        for img, gt_bboxes in tqdm(zip(images, annotations), desc="Extracting data...", total=len(images)):
+            
+            rois_imgs, rois_bboxes = self.get_ROIs(image=img) 
+
+            rois_ious, matched_bboxes = self.get_IOUs(gt_bboxes=gt_bboxes, 
+                                                      rois=rois_bboxes)
+
+            for idx, iou in enumerate(rois_ious):
+                if iou >= 0.4:
+                    Y_imgs.append([1.0])
+                    Y_bboxes.append(matched_bboxes[idx])
+                else:
+                    Y_imgs.append([0.0])
+                    Y_bboxes.append(np.array([0, 0, 0, 0]))
+
+                X_imgs.append(rois_imgs[idx])
+                X_bboxes.append(rois_bboxes[idx])
+                IOUs.append(iou)
+
+        # Computing precision
+        model = load_model(filepath=f'models/{self.name}.h5', 
+                           compile=True)
+        loss, val_precision = model.evaluate(x=np.array(X_imgs),
+                                             y=np.array(Y_imgs),
+                                             batch_size=64,
+                                             verbose=0)
+
+        Y_pred = model.predict(np.array(X_imgs)).flatten()
+        idxs = np.where(Y_pred >= pred_threshold)[0]
+        avg_iou = np.average(np.array(IOUs)[idxs])
+
+        print(f"Evaluated precision: {val_precision*100:.2f}%, {avg_iou:.2f} avg. IoU")
 
     def predict(self, images, threshold):
         """
@@ -279,7 +332,8 @@ class RCNN:
             - final_scores: Prediction scores for the selected ROIs.
         """
 
-        model = load_model(f'models/{self.name}.h5')
+        model = load_model(filepath=f'models/{self.name}.h5', 
+                           compile=True)
 
         final_scores = []
         final_rois = []
