@@ -5,17 +5,19 @@ import cv2
 from skimage.feature import hog
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVC
+from sklearn.metrics import precision_score
 from config import IoU
 import pickle
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 
 class HOG_Detector:
-    def __init__(self, window_size=(64,64), orientations=9, pixels_per_cell=(8, 8), cells_per_block=(2, 2)):
+    def __init__(self, window_size=(64,64), orientations=9, pixels_per_cell=(8, 8), cells_per_block=(2, 2), name='hog'):
         self.window_size = window_size
         self.orientations = orientations
         self.pixels_per_cell = pixels_per_cell
         self.cells_per_block = cells_per_block
+        self.name = name
 
         self.block_size = (cells_per_block[0] * pixels_per_cell[0],
                            cells_per_block[1] * pixels_per_cell[1])
@@ -235,7 +237,7 @@ class HOG_Detector:
         Y_data = []
         neg_samples_cnt = 0
 
-        for img, gt_bboxes in tqdm(zip(images, annotations), desc="Extracting data", total=len(images)):
+        for img, gt_bboxes in tqdm(zip(images, annotations), desc="Extracting data...", total=len(images)):
             
             selected_rois = []
             # Avoid issues with empty annotations and ensure correct shape
@@ -290,7 +292,7 @@ class HOG_Detector:
         # Standardize features
         scaler = StandardScaler()
         X_train = scaler.fit_transform(X_train)
-        with open('models/hog_scaler.pkl', 'wb') as f:
+        with open(f'models/{self.name}_scaler.pkl', 'wb') as f:
             pickle.dump(scaler, f)
 
         print(f"Positive samples: {np.sum(Y_train==1)}, Negative samples: {np.sum(Y_train==0)} \n")
@@ -301,15 +303,18 @@ class HOG_Detector:
         model.fit(X_train, Y_train)
         
         # Evaluate model on training data
-        train_accuracy = model.score(X_train, Y_train) * 100
+        Y_pred = model.predict(X_train)
+        train_precision = precision_score(y_true=Y_train, y_pred=Y_pred) * 100
+
+        #train_accuracy = model.score(X_train, Y_train) * 100
 
         # Save the trained model
-        with open('models/hog_svm_model.pkl', 'wb') as f:
+        with open(f'models/{self.name}_svm_model.pkl', 'wb') as f:
             pickle.dump(model, f)
 
-        print("Model trained and saved as 'models/hog_svm_model.pkl'")
-        print(f"Training completed. Evaluation on training data: {train_accuracy:.2f}% accuracy")
-        
+        print(f"Training completed. Evaluation on training data: {train_precision:.2f}% precision")
+        print(f"Model saved as 'models/{self.name}_svm_model.pkl'")
+
     def evaluate(self, images, annotations):
         """
         Evaluate the trained model on a validation set.
@@ -323,16 +328,18 @@ class HOG_Detector:
 
         print('Evaluating model...')
 
-        model = pickle.load(open('models/hog_svm_model.pkl', 'rb'))
+        model = pickle.load(open(f'models/{self.name}_svm_model.pkl', 'rb'))
 
         X_val, Y_val = self.extract_data(images, annotations)
 
         # Standardize features
-        scaler = pickle.load(open('models/hog_scaler.pkl', 'rb'))
+        scaler = pickle.load(open(f'models/{self.name}_scaler.pkl', 'rb'))
         X_val = scaler.transform(X_val)
-
-        val_accuracy = model.score(X_val, Y_val) * 100
-        print(f"Evaluation accuracy: {val_accuracy:.2f}%")
+        
+        # Evaluate 
+        Y_pred = model.predict(X_val)
+        val_precision = precision_score(y_true=Y_val, y_pred=Y_pred) * 100
+        print(f"Evaluated precision: {val_precision:.2f}%")
 
     def predict(self, images, threshold):
         """
@@ -345,15 +352,13 @@ class HOG_Detector:
         Returns bounding boxes that conatins object.
         """
 
-        print('Predicting on test images...')
-
-        scaler = pickle.load(open('models/hog_scaler.pkl', 'rb'))
-        model = pickle.load(open('models/hog_svm_model.pkl', 'rb'))
+        scaler = pickle.load(open(f'models/{self.name}_scaler.pkl', 'rb'))
+        model = pickle.load(open(f'models/{self.name}_svm_model.pkl', 'rb'))
 
         final_bboxes = []
         final_scores = []
 
-        for img in tqdm(images, desc="Predicting", total=len(images)):
+        for img in tqdm(images, desc="Predicting on test images...", total=len(images)):
             img_features = []
             img_bboxes = []
 
