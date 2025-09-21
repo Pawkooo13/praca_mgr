@@ -55,11 +55,14 @@ def average_IoU(gt_bboxes, pred_bboxes):
 
         for pred_bbox in pred_bboxes_per_img:
             ious = [IoU(box1=gt_box, box2=pred_bbox) for gt_box in gt_bboxes_per_img]
-            max_ious.append(np.max(ious))
+            if len(ious) != 0:
+                max_ious.append(np.max(ious))
+            #else:
+            #    max_ious.append(0)
 
     return np.average(max_ious)
 
-def plot_predictions(images, bboxes, name):
+def plot_predictions(images, gt_bboxes, pred_bboxes, name):
     """
     Plot given bboxes on given images and save in plots directory.
     """
@@ -67,8 +70,14 @@ def plot_predictions(images, bboxes, name):
     
     for i, image in enumerate(images):
         
-        for box in bboxes[i]:
-            x_center, y_center, width, height = box
+        for gt_box in gt_bboxes[i]:
+            x_center, y_center, width, height = gt_box
+            top_left = (int(x_center - width/2), int(y_center - height/2))
+            bottom_right = (int(x_center + width/2), int(y_center + height/2))
+            cv2.rectangle(image, top_left, bottom_right, (0, 255, 0), 2)
+
+        for pred_box in pred_bboxes[i]:
+            x_center, y_center, width, height = pred_box
             top_left = (int(x_center - width/2), int(y_center - height/2))
             bottom_right = (int(x_center + width/2), int(y_center + height/2))
             cv2.rectangle(image, top_left, bottom_right, (255, 0, 0), 2)
@@ -78,4 +87,3 @@ def plot_predictions(images, bboxes, name):
 
     save_path = os.path.join('plots/', str(name + '.png'))
     plt.savefig(save_path)
-    plt.show()
