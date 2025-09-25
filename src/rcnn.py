@@ -27,8 +27,10 @@ from tqdm import tqdm
 from config import IoU
 
 class RCNN:
-    def __init__(self, name):
+    def __init__(self, resize, cnn, name):
         self.name = name
+        self.resize = resize
+        self.cnn = cnn
 
     def get_ROIs(self, image):
         """
@@ -38,7 +40,7 @@ class RCNN:
             image: The input image for which to generate region proposals.
 
         Returns:
-            - rois_iamges: A list of ROI images resized to (64, 64, 3).
+            - rois_images: A list of ROI images resized to (64, 64, 3).
             - rois_coordinates: A list of ROI coordinates, where each ROI is represented as [x, y, w, h].
         """
         ss = cv2.ximgproc.segmentation.createSelectiveSearchSegmentation()
@@ -48,11 +50,12 @@ class RCNN:
 
         # Preallocate output arrays for efficiency
         num_rois = len(rois_coordinates)
-        rois_images = np.empty((num_rois, 64, 64, 3), dtype=np.uint8)
+        img_w, img_h = self.resize
+        rois_images = np.empty((num_rois, img_w, img_h, 3), dtype=np.uint8)
 
         for i, (x, y, w, h) in enumerate(rois_coordinates):
             region = image[y:y+h, x:x+w]
-            region_resized = cv2.resize(region, (64, 64))
+            region_resized = cv2.resize(region, (img_w, img_h))
             rois_images[i] = region_resized
 
         rois_coords = [[x+w/2, y+h/2, w, h] for x,y,w,h in rois_coordinates]
@@ -129,86 +132,6 @@ class RCNN:
                     neg_samples_cnt += 1
 
         return np.array(X_imgs), np.array(Y_imgs), np.array(X_bboxes), np.array(Y_bboxes)
-    
-    def CNN(self):
-        """
-        Builds and compiles a Convolutional Neural Network (CNN) model for image classification.
-
-        The model architecture includes:
-            - Input layer for 64x64 RGB images.
-            - Data augmentation layers: random flipping, translation, and zoom.
-            - Rescaling layer to normalize pixel values.
-            - Three convolutional blocks, each with Conv2D and MaxPool2D layers.
-            - Flatten layer to convert feature maps to a 1D vector.
-            - Three dense layers for feature extraction.
-            - Output layers: a dense layer with 1 unit (sigmoid activation) for binary classification.
-        The model is compiled with:
-            - Adam optimizer (learning rate: 0.0015)
-            - Binary crossentropy loss
-            - Precision metric
-            
-        Returns:
-            Compiled CNN model.
-        """
-        model = Sequential([
-            Input(shape=(64, 64, 3)),
-            RandomFlip(mode='horizontal_and_vertical'),
-            RandomTranslation(height_factor=0.15,
-                              width_factor=0.15),
-            RandomZoom(height_factor=0.15,
-                       width_factor=0.15),
-            Rescaling(scale=1./255,
-                      offset=0.0),
-            
-            Conv2D(filters=16,
-                   kernel_size=(5,5),
-                   kernel_initializer='random_normal',
-                   strides=(1,1),
-                   activation='relu',
-                   padding='same'),
-            MaxPool2D(pool_size=(3,3),
-                      strides=(2,2)),
-            
-            Conv2D(filters=16,
-                   kernel_size=(3,3),
-                   kernel_initializer='random_normal',
-                   strides=(1,1),
-                   activation='relu',
-                   padding='same'),
-            MaxPool2D(pool_size=(3,3),
-                      strides=(2,2)),
-            
-            Conv2D(filters=16,
-                   kernel_size=(3,3),
-                   kernel_initializer='random_normal',
-                   strides=(1,1),
-                   activation='relu',
-                   padding='same'),
-            MaxPool2D(pool_size=(3,3),
-                     strides=(2,2)),
-            
-            Flatten(),
-            
-            Dense(units=32,
-                  activation='relu',
-                  kernel_initializer='random_normal'),
-            Dense(units=32,
-                  activation='relu',
-                  kernel_initializer='random_normal'),
-            
-            Dense(units=4,
-                  activation='relu',
-                  kernel_initializer='random_normal'),
-            Dense(units=1,
-                  activation='sigmoid',
-                  kernel_initializer='random_normal')
-        ])
-
-        model.compile(optimizer = Adam(learning_rate=0.0015), 
-                      loss=BinaryCrossentropy(), 
-                      metrics=[Precision(name="precision", thresholds=0.5)])
-
-        return model
 
     def train(self, images, annotations, max_neg_samples, epochs):
         """
@@ -234,7 +157,7 @@ class RCNN:
         print(f"Positive samples: {np.sum(Y_img==1)}, Negative samples: {np.sum(Y_img==0)} \n")
 
         print('Training model...')
-        model = self.CNN()
+        model = self.cnn
         training_history = model.fit(x=X_img,
                                      y=Y_img,
                                      batch_size=64,
