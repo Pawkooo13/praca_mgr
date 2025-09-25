@@ -26,17 +26,17 @@ def preprocess(image):
         
     if mean_luminance < 50:
         gamma = 0.7
-        lower = np.array([30, 0, 50])
+        lower = np.array([40, 0, 50])
         upper = np.array([180, 170, 255])
             
     elif mean_luminance > 85:
         gamma = 1.2
-        lower = np.array([30, 0, 90])
+        lower = np.array([40, 0, 90])
         upper = np.array([180, 170, 255])
             
     else:
         gamma = 0.8
-        lower = np.array([30, 0, 70])
+        lower = np.array([40, 0, 70])
         upper = np.array([180, 170, 255])
             
     image_gamma = adjust_gamma(image, gamma)
