@@ -2,6 +2,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import cv2
 import os
+from processing import NMS
+import json
 
 def IoU(box1, box2):
     """
@@ -61,6 +63,48 @@ def average_IoU(gt_bboxes, pred_bboxes):
             #    max_ious.append(0)
 
     return np.average(max_ious)
+
+def average_IoU_after_NMS(gt_bboxes, pred_bboxes, pred_scores, nms_threshold):
+    """
+    Compute average IoU for compressed bounding boxes.
+    """
+    selected_bboxes = []
+
+    for img_bboxes, img_scores in zip(pred_bboxes, pred_scores):
+        if len(img_bboxes) != 0:
+            selected_bboxes.append(NMS(bboxes=img_bboxes,
+                                       scores=img_scores,
+                                       iou_threshold=nms_threshold))
+        else:
+            selected_bboxes.append([])
+
+    avg_iou = average_IoU(gt_bboxes=gt_bboxes,
+                          pred_bboxes=selected_bboxes)
+        
+    #print(f"Average IoU after NMS with {nms_threshold} threshold is equals {avg_iou:.2f}")
+
+    return avg_iou, np.array(selected_bboxes)
+
+def avg_IoU_after_NMS_with_given_tsh(gt_bboxes,
+                                     pred_bboxes,
+                                     pred_scores,
+                                     thresholds, 
+                                     name):
+    results = {}
+    for tsh in thresholds:
+        avg_iou = average_IoU_after_NMS(gt_bboxes=gt_bboxes,
+                                        pred_bboxes=pred_bboxes,
+                                        pred_scores=pred_scores,
+                                        nms_threshold=tsh)[0]
+        
+        results[f'{tsh}'] = round(avg_iou, 2)
+    
+    print(results)
+
+    with open(f"results/{name}.json", "w") as f:
+        json.dump(results, f, indent=4)
+
+    print(f"Results saved as resuts/{name}.json")
 
 def plot_predictions(images, gt_bboxes, pred_bboxes, name):
     """
