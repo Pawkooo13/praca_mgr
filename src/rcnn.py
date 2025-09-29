@@ -6,6 +6,7 @@ import cv2
 from tensorflow.keras.models import load_model
 from tqdm import tqdm
 from config import IoU
+import time as t
 
 class RCNN:
     def __init__(self, resize, cnn, name):
@@ -242,9 +243,12 @@ class RCNN:
         final_scores = []
         final_rois = []
         final_bboxes = []
+        times = []
 
         for img in tqdm(images, desc="Predicting on test images...", total=len(images)):
             
+            start_time = t.time()
+
             rois_imgs, rois_bboxes = self.get_ROIs(image=img) 
 
             predictions = model.predict(rois_imgs).flatten()
@@ -254,4 +258,8 @@ class RCNN:
             final_rois.append(rois_imgs[idxs])
             final_bboxes.append(rois_bboxes[idxs])
 
-        return np.array(final_rois), np.array(final_bboxes), np.array(final_scores)
+            end_time = t.time()
+
+            times.append(round(end_time - start_time, 2))
+
+        return np.array(final_rois), np.array(final_bboxes), np.array(final_scores), np.average(times)

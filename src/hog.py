@@ -13,6 +13,7 @@ from config import IoU
 import pickle
 from tqdm import tqdm
 import matplotlib.pyplot as plt
+import time as t
 
 class HOG_Detector:
     def __init__(self, 
@@ -320,7 +321,7 @@ class HOG_Detector:
 
         # Train a linear SVM classifier
         print("Training model...")
-        model = SVC(kernel='linear', probability=True, cache_size=2000, random_state=42)
+        model = SVC(kernel='rbf', C=10, probability=True, cache_size=2000, random_state=42)
         model.fit(X_scaled_img, Y_img)
         
         # Evaluate model on training data
@@ -433,8 +434,11 @@ class HOG_Detector:
 
         final_bboxes = []
         final_scores = []
+        times = []
 
         for img in tqdm(images, desc="Predicting on test images...", total=len(images)):
+            
+            start_time = t.time()
 
             for window_size in self.window_sizes:
                 zoom_factor = self.base_window_size[0] / window_size[0]
@@ -456,7 +460,10 @@ class HOG_Detector:
             selected_bboxes = transformed_bboxes[idxs]
             selected_scores = predictions[idxs]
 
+            end_time = t.time()
+
             final_bboxes.append(selected_bboxes)
             final_scores.append(selected_scores)
+            times.append(round(end_time - start_time, 2))
 
-        return np.array(final_bboxes), np.array(final_scores)
+        return np.array(final_bboxes), np.array(final_scores), np.average(times)
