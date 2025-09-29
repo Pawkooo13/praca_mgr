@@ -16,7 +16,10 @@ from tensorflow.keras.layers import (
 )
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.losses import BinaryCrossentropy
-from tensorflow.keras.metrics import Precision
+from tensorflow.keras.metrics import (
+    Precision,
+    Recall
+)
 
 def get_visem_cnn():
     """
@@ -96,6 +99,7 @@ def get_visem_cnn():
 
     model.compile(optimizer=Adam(learning_rate=0.0015), 
                   loss=BinaryCrossentropy(), 
-                  metrics=[Precision(name="precision", thresholds=0.5)])
+                  metrics=[Precision(name="precision", thresholds=0.5),
+                           Recall(name="recall", thresholds=0.5)])
 
     return model

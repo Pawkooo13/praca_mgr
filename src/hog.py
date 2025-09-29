@@ -5,7 +5,10 @@ import cv2
 from skimage.feature import hog
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVC
-from sklearn.metrics import precision_score
+from sklearn.metrics import (
+    precision_score, 
+    recall_score
+)
 from config import IoU
 import pickle
 from tqdm import tqdm
@@ -323,6 +326,7 @@ class HOG_Detector:
         # Evaluate model on training data
         Y_pred = model.predict(X_scaled_img)
         train_precision = precision_score(y_true=Y_img, y_pred=Y_pred) * 100
+        train_recall = recall_score(y_true=Y_img, y_pred=Y_pred) * 100
 
         ious = []
         for x_bbox, y_bbox in zip(X_bboxes, Y_bboxes):
@@ -335,7 +339,7 @@ class HOG_Detector:
         with open(f'models/{self.name}_svm_model.pkl', 'wb') as f:
             pickle.dump(model, f)
 
-        print(f"Training completed. Evaluation on training data: {train_precision:.2f}% precision, {avg_iou:.2f} IoU")
+        print(f"Training completed. Evaluation on training data: (Precision: {train_precision:.2f}%), (Recall: {train_recall:.2f}%), {avg_iou:.2f} avg. IoU")
         print(f"Model saved as 'models/{self.name}_svm_model.pkl'")
 
     def evaluate(self, images, annotations, pred_threshold):
@@ -410,7 +414,8 @@ class HOG_Detector:
         avg_iou = np.average(np.array(IOUs)[idxs])
 
         val_precision = precision_score(y_true=Y_img, y_pred=Y_pred) * 100
-        print(f"Evaluated precision: {val_precision:.2f}%, {avg_iou:.2f} avg. IoU")
+        val_recall = recall_score(y_true=Y_img, y_pred=Y_pred) * 100
+        print(f"Evaluated metrics: (Precision: {val_precision:.2f}%), (Recall: {val_recall:.2f}%), {avg_iou:.2f} avg. IoU")
 
     def predict(self, images, threshold):
         """

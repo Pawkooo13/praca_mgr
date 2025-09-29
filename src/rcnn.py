@@ -170,7 +170,7 @@ class RCNN:
         plt.savefig(plot_path)
 
         # Evaluate model
-        loss, precision = model.evaluate(x=X_img,
+        loss, precision, recall = model.evaluate(x=X_img,
                                          y=Y_img,
                                          batch_size=64)
         ious = []
@@ -184,7 +184,7 @@ class RCNN:
         model_path = os.path.join('models', str(self.name) + '.h5')
         model.save(model_path)
 
-        print(f"Training completed. Evaluation on training data: {precision * 100:.2f}% precision, {avg_iou:.2f} avg. IoU")
+        print(f"Training completed. Evaluation on training data: {precision * 100:.2f}% precision, {recall * 100:.2f}% recall, {avg_iou:.2f} avg. IoU")
         print(f"Model saved as {model_path}")
 
     def evaluate(self, images, annotations, pred_threshold):
@@ -230,16 +230,16 @@ class RCNN:
         # Computing precision
         model = load_model(filepath=f'models/{self.name}.h5', 
                            compile=True)
-        loss, val_precision = model.evaluate(x=np.array(X_imgs),
-                                             y=np.array(Y_imgs),
-                                             batch_size=64,
-                                             verbose=0)
+        loss, val_precision, val_recall = model.evaluate(x=np.array(X_imgs),
+                                                         y=np.array(Y_imgs),
+                                                         batch_size=64,
+                                                         verbose=0)
 
         Y_pred = model.predict(np.array(X_imgs)).flatten()
         idxs = np.where(Y_pred >= pred_threshold)[0]
         avg_iou = np.average(np.array(IOUs)[idxs])
 
-        print(f"Evaluated precision: {val_precision*100:.2f}%, {avg_iou:.2f} avg. IoU")
+        print(f"Evaluated precision: {val_precision*100:.2f}%, {val_recall*100:.2f}%, {avg_iou:.2f} avg. IoU")
 
     def predict(self, images, threshold):
         """
