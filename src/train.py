@@ -39,7 +39,7 @@ def load_data(images_dir, annotations_file):
     else:
         qry = "`image` == @img_name & `class_id` == 0"
 
-    image_files = set(os.listdir(images_dir)[:100])
+    image_files = set(os.listdir(images_dir))
 
     images = []
     bboxes = []
