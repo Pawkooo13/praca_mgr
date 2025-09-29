@@ -3,25 +3,6 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import os
 import cv2
-from tensorflow.keras import (
-    Sequential, 
-    Input
-)
-from tensorflow.keras.layers.experimental.preprocessing import (
-    RandomFlip,
-    RandomTranslation,
-    RandomZoom,
-    Rescaling
-)
-from tensorflow.keras.layers import (
-    Dense, 
-    Conv2D, 
-    MaxPool2D,
-    Flatten
-)
-from tensorflow.keras.optimizers import Adam
-from tensorflow.keras.losses import BinaryCrossentropy
-from tensorflow.keras.metrics import Precision
 from tensorflow.keras.models import load_model
 from tqdm import tqdm
 from config import IoU
