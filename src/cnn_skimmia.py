@@ -42,7 +42,7 @@ def get_skimmia_cnn():
             Compiled CNN model.
     """
     model = Sequential([
-                Input(shape=(64, 64, 3)),
+                Input(shape=(96, 96, 3)),
                 RandomFlip(mode='horizontal_and_vertical'),
                 RandomTranslation(height_factor=0.1,
                                   width_factor=0.1),
@@ -80,10 +80,10 @@ def get_skimmia_cnn():
                 
                 Flatten(),
                 
-                Dense(units=16,
+                Dense(units=32,
                       activation='relu',
                       kernel_initializer='random_normal'),
-                Dense(units=16,
+                Dense(units=32,
                       activation='relu',
                       kernel_initializer='random_normal'),
                 Dense(units=4,

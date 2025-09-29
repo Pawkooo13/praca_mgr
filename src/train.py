@@ -85,20 +85,22 @@ def main():
 
     hog_skimmia_detector.train(images=skimmia_images_train, 
                                annotations=skimmia_bboxes_train,
-                               max_neg_samples=2000)
+                               max_neg_samples=20000)
     
     hog_skimmia_detector.evaluate(images=skimmia_images_valid, 
                                   annotations=skimmia_bboxes_valid,
                                   pred_threshold=0.6)
     
-    hog_skimmia_pred_bboxes, hog_skimmia_pred_scores = hog_skimmia_detector.predict(images=skimmia_images_test,
-                                                                                    threshold=0.6)
+    hog_skimmia_pred_bboxes, hog_skimmia_pred_scores, hog_skimmia_avg_pred_time = hog_skimmia_detector.predict(images=skimmia_images_test,
+                                                                                                               threshold=0.6)
 
     avg_IoU_after_NMS_with_given_tsh(gt_bboxes=skimmia_bboxes_test,
                                      pred_bboxes=hog_skimmia_pred_bboxes,
                                      pred_scores=hog_skimmia_pred_scores,
                                      thresholds=[0.1, 0.15, 0.2, 0.25, 0.3],
                                      name='hog_skimmia')
+    
+    print(f"Average prediction time: {hog_skimmia_avg_pred_time:.2f} s")
                                                                                     
     hog_skimmia_avg_iou, hog_skimmia_selected_bboxes = average_IoU_after_NMS(gt_bboxes=skimmia_bboxes_test,
                                                                              pred_bboxes=hog_skimmia_pred_bboxes,
@@ -116,27 +118,29 @@ def main():
 
     cnn_skimmia = get_skimmia_cnn()
 
-    rcnn_skimmia = RCNN(resize=(64, 64), 
+    rcnn_skimmia = RCNN(resize=(96, 96), 
                         cnn=cnn_skimmia, 
                         name='rcnn_skimmia')
 
     rcnn_skimmia.train(images=skimmia_images_train,
                        annotations=skimmia_bboxes_train,
-                       max_neg_samples=3000,
+                       max_neg_samples=30000,
                        epochs=80)
     
     rcnn_skimmia.evaluate(images=skimmia_images_valid,
                           annotations=skimmia_bboxes_valid,
                           pred_threshold=0.6)
 
-    rcnn_skimmia_pred_rois, rcnn_skimmia_pred_bboxes, rcnn_skimmia_pred_scores = rcnn_skimmia.predict(images=skimmia_images_test, 
-                                                                                                      threshold=0.6)
+    rcnn_skimmia_pred_rois, rcnn_skimmia_pred_bboxes, rcnn_skimmia_pred_scores, rcnn_skimmia_avg_pred_time = rcnn_skimmia.predict(images=skimmia_images_test, 
+                                                                                                                                  threshold=0.6)
 
     avg_IoU_after_NMS_with_given_tsh(gt_bboxes=skimmia_bboxes_test,
                                      pred_bboxes=rcnn_skimmia_pred_bboxes,
                                      pred_scores=rcnn_skimmia_pred_scores,
                                      thresholds=[0.1, 0.15, 0.2, 0.25, 0.3],
                                      name='rcnn_skimmmia')
+    
+    print(f"Average prediction time: {rcnn_skimmia_avg_pred_time:.2f} s")
 
     rcnn_skimmia_avg_iou, rcnn_skimmia_selected_bboxes = average_IoU_after_NMS(gt_bboxes=skimmia_bboxes_test,
                                                                                pred_bboxes=rcnn_skimmia_pred_bboxes,
@@ -148,7 +152,6 @@ def main():
                      pred_bboxes=rcnn_skimmia_selected_bboxes[:5],
                      name='rcnn_skimmia_images_predictions')
 
-    '''
     #-------------------- LOADING PREPROCESSED SKIMMIA IMAGES --------------------
     print('\n')
     print('Loading preprecessed skimmia images... \n')
@@ -174,14 +177,16 @@ def main():
                                       annotations=skimmia_bboxes_valid,
                                       pred_threshold=0.6)
     
-    hog_pre_skimmia_pred_bboxes, hog_pre_skimmia_pred_scores = hog_pre_skimmia_detector.predict(images=skimmia_images_test,
-                                                                                                threshold=0.6)
+    hog_pre_skimmia_pred_bboxes, hog_pre_skimmia_pred_scores, hog_pre_skimmia_avg_pred_time = hog_pre_skimmia_detector.predict(images=skimmia_images_test,
+                                                                                                                               threshold=0.6)
 
     avg_IoU_after_NMS_with_given_tsh(gt_bboxes=skimmia_bboxes_test,
                                      pred_bboxes=hog_pre_skimmia_pred_bboxes,
                                      pred_scores=hog_pre_skimmia_pred_scores,
                                      thresholds=[0.1, 0.15, 0.2, 0.25, 0.3],
                                      name='hog_pre_skimmia')
+
+    print(f"Average prediction time: {hog_pre_skimmia_avg_pred_time:.2f} s")
 
     hog_pre_skimmia_avg_iou, hog_pre_skimmia_selected_bboxes = average_IoU_after_NMS(gt_bboxes=skimmia_bboxes_test,
                                                                                      pred_bboxes=hog_pre_skimmia_pred_bboxes,
@@ -200,7 +205,7 @@ def main():
 
     cnn_pre_skimmia = get_skimmia_cnn()
 
-    rcnn_pre_skimmia = RCNN(resize=(64, 64),
+    rcnn_pre_skimmia = RCNN(resize=(96, 96),
                             cnn=cnn_pre_skimmia,
                             name='rcnn_skimmia_preprocessed')
 
@@ -213,14 +218,16 @@ def main():
                               annotations=skimmia_bboxes_valid,
                               pred_threshold=0.6)
 
-    rcnn_pre_skimmia_pred_rois, rcnn_pre_skimmia_pred_bboxes, rcnn_pre_skimmia_pred_scores = rcnn_pre_skimmia.predict(images=preprocessed_skimmia_images_test, 
-                                                                                                                      threshold=0.6)
+    rcnn_pre_skimmia_pred_rois, rcnn_pre_skimmia_pred_bboxes, rcnn_pre_skimmia_pred_scores, rcnn_pre_skimmia_avg_pred_time = rcnn_pre_skimmia.predict(images=preprocessed_skimmia_images_test, 
+                                                                                                                                                      threshold=0.6)
 
     avg_IoU_after_NMS_with_given_tsh(gt_bboxes=skimmia_bboxes_test,
                                      pred_bboxes=rcnn_pre_skimmia_pred_bboxes,
                                      pred_scores=rcnn_pre_skimmia_pred_scores,
                                      thresholds=[0.1, 0.15, 0.2, 0.25, 0.3],
                                      name='rcnn_pre_skimmia')
+
+    print(f"Average prediction time: {rcnn_pre_skimmia_avg_pred_time:.2f} s")
 
     rcnn_pre_skimmia_avg_iou, rcnn_pre_skimmia_selected_bboxes = average_IoU_after_NMS(gt_bboxes=skimmia_bboxes_test,
                                                                                        pred_bboxes=rcnn_pre_skimmia_pred_bboxes,
@@ -262,14 +269,16 @@ def main():
                                 annotations=visem_bboxes_valid,
                                 pred_threshold=0.6)
     
-    hog_visem_pred_bboxes, hog_visem_pred_scores = hog_visem_detector.predict(images=visem_images_test,
-                                                                              threshold=0.6)
+    hog_visem_pred_bboxes, hog_visem_pred_scores, hog_visem_avg_pred_time = hog_visem_detector.predict(images=visem_images_test,
+                                                                                                       threshold=0.6)
 
     avg_IoU_after_NMS_with_given_tsh(gt_bboxes=visem_bboxes_test,
                                      pred_bboxes=hog_visem_pred_bboxes,
                                      pred_scores=hog_visem_pred_scores,
                                      thresholds=[0.1, 0.15, 0.2, 0.25, 0.3],
                                      name='hog_visem')
+
+    print(f"Average prediction time: {hog_visem_avg_pred_time:.2f} s")
 
     hog_visem_avg_iou, hog_visem_selected_bboxes = average_IoU_after_NMS(gt_bboxes=visem_bboxes_test,
                                                                          pred_bboxes=hog_visem_pred_bboxes,
@@ -301,14 +310,16 @@ def main():
                         annotations=visem_bboxes_valid,
                         pred_threshold=0.6)
 
-    rcnn_visem_pred_rois, rcnn_visem_pred_bboxes, rcnn_visem_pred_scores = rcnn_visem.predict(images=visem_images_test, 
-                                                                                              threshold=0.6)
+    rcnn_visem_pred_rois, rcnn_visem_pred_bboxes, rcnn_visem_pred_scores, rcnn_visem_avg_pred_time = rcnn_visem.predict(images=visem_images_test, 
+                                                                                                                        threshold=0.6)
 
     avg_IoU_after_NMS_with_given_tsh(gt_bboxes=visem_bboxes_test,
                                      pred_bboxes=rcnn_visem_pred_bboxes,
                                      pred_scores=rcnn_visem_pred_scores,
                                      thresholds=[0.1, 0.15, 0.2, 0.25, 0.3],
                                      name='rcnn_visem')
+
+    print(f"Average prediction time: {rcnn_visem_avg_pred_time:.2f} s")
 
     rcnn_visem_avg_iou, rcnn_visem_selected_bboxes = average_IoU_after_NMS(gt_bboxes=visem_bboxes_test,
                                                                            pred_bboxes=rcnn_visem_pred_bboxes,
@@ -319,7 +330,6 @@ def main():
                      gt_bboxes=visem_bboxes_test[:5],
                      pred_bboxes=rcnn_visem_selected_bboxes[:5],
                      name='rcnn_visem_images_predictions')
-    '''
-    
+
 if __name__ == '__main__':
     main()
