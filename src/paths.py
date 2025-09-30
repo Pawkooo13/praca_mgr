@@ -19,3 +19,5 @@ VISEM_ANNOTATIONS_VALID = 'data/visem/annotations/annotations_valid.csv'
 VISEM_ANNOTATIONS_TEST = 'data/visem/annotations/annotations_test.csv'
 
 PLOTS_DIR = 'plots/'
+MODELS_DIR = 'models/'
+RESULTS_DIR = 'results/'
