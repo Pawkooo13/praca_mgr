@@ -1,8 +1,6 @@
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' # To remove CUDA logs
-import pandas as pd
 import numpy as np
-import cv2
 from hog import HOG_Detector
 from cnn_skimmia import get_skimmia_cnn
 from cnn_visem import get_visem_cnn
@@ -11,6 +9,7 @@ from processing import (
     preprocess, 
 )
 from config import (
+    load_data,
     plot_predictions, 
     average_IoU_after_NMS,
     avg_IoU_after_NMS_with_given_tsh
@@ -25,40 +24,6 @@ from paths import (
     VISEM_IMAGES_VALID, VISEM_ANNOTATIONS_VALID,
     VISEM_IMAGES_TEST, VISEM_ANNOTATIONS_TEST
 )
-
-def load_data(images_dir, annotations_file):
-    """ 
-    Load images and annotations from the specified directories and files.
-    Returns arrays of images and corresponding bounding boxes.
-    """
-    annotations = pd.read_csv(annotations_file)
-    # Remove file extension from image names for consistency (Skimmia dataset)
-    if 'skimmia' in annotations_file:
-        annotations['image'] = annotations['image'].str[:-4]
-        qry = "`image` == @img_name"
-    else:
-        qry = "`image` == @img_name & `class_id` == 0"
-
-    image_files = set(os.listdir(images_dir))
-
-    images = []
-    bboxes = []
-
-    for image in image_files:
-        image_path = os.path.join(images_dir, image)
-        if not os.path.isfile(image_path):
-            raise FileNotFoundError(f"Image file {image} not found in {images_dir}")
-        else:
-            img = cv2.imread(image_path)
-            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-            images.append(img)
-
-            img_name = image[:-4] # remove .jpg extension
-            img_annotations = annotations.query(qry)
-            img_bboxes = img_annotations[['x_center', 'y_center', 'width', 'height']].values.tolist()
-            bboxes.append(img_bboxes)
-
-    return np.array(images), np.array(bboxes)
 
 def main():
     warnings.filterwarnings("ignore")

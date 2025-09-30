@@ -4,6 +4,41 @@ import cv2
 import os
 from processing import NMS
 import json
+import pandas as pd
+
+def load_data(images_dir, annotations_file):
+    """ 
+    Load images and annotations from the specified directories and files.
+    Returns arrays of images and corresponding bounding boxes.
+    """
+    annotations = pd.read_csv(annotations_file)
+    # Remove file extension from image names for consistency (Skimmia dataset)
+    if 'skimmia' in annotations_file:
+        annotations['image'] = annotations['image'].str[:-4]
+        qry = "`image` == @img_name"
+    else:
+        qry = "`image` == @img_name & `class_id` == 0"
+
+    image_files = set(os.listdir(images_dir))
+
+    images = []
+    bboxes = []
+
+    for image in image_files:
+        image_path = os.path.join(images_dir, image)
+        if not os.path.isfile(image_path):
+            raise FileNotFoundError(f"Image file {image} not found in {images_dir}")
+        else:
+            img = cv2.imread(image_path)
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            images.append(img)
+
+            img_name = image[:-4] # remove .jpg extension
+            img_annotations = annotations.query(qry)
+            img_bboxes = img_annotations[['x_center', 'y_center', 'width', 'height']].values.tolist()
+            bboxes.append(img_bboxes)
+
+    return np.array(images), np.array(bboxes)
 
 def IoU(box1, box2):
     """

@@ -1,4 +1,3 @@
-import pandas as pd
 import numpy as np
 import math
 import cv2
@@ -12,7 +11,6 @@ from sklearn.metrics import (
 from config import IoU
 import pickle
 from tqdm import tqdm
-import matplotlib.pyplot as plt
 import time as t
 
 class HOG_Detector:
