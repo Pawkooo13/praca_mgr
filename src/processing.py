@@ -1,9 +1,13 @@
 import numpy as np
 import cv2
-from skimage.exposure import adjust_gamma
+from skimage.exposure import (
+    adjust_gamma, 
+    equalize_adapthist
+)
+from skimage.morphology import area_closing
 import tensorflow as tf
 
-def preprocess(image):
+def preprocess_skimmia(image):
     """
     Preprocesses an input image by adjusting its gamma based on luminance and applying color thresholding in the HLS color space.
 
@@ -45,6 +49,26 @@ def preprocess(image):
     processed_image = cv2.bitwise_and(image_gamma, image_gamma, mask=mask)
 
     return processed_image
+
+def preprocess_visem(image):
+    """
+    Preprocesses an input image by applying adaptive histogram equalization and morphological area closing to remove black noise.
+
+    Args:
+        image: Input image in grayscale format.
+
+    Returns:
+        Processed image after applying adaptive histogram equalization and area closing.
+
+    The function performs the following steps:
+        1. Applies adaptive histogram equalization to enhance contrast.
+        2. Applies morphological area closing to remove small dark regions (black noise) from the image.
+    """
+
+    img_adapteq = equalize_adapthist(image, clip_limit=0.005)
+    preprocessed_image = area_closing(img_adapteq, area_threshold=64, connectivity=1)
+
+    return preprocessed_image
 
 def NMS(bboxes, scores, iou_threshold):
     """
