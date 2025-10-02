@@ -64,8 +64,8 @@ def preprocess_visem(image):
         1. Applies adaptive histogram equalization to enhance contrast.
         2. Applies morphological area closing to remove small dark regions (black noise) from the image.
     """
-
-    img_adapteq = equalize_adapthist(image, clip_limit=0.005)
+    img_gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
+    img_adapteq = equalize_adapthist(img_gray, clip_limit=0.005)
     preprocessed_image = area_closing(img_adapteq, area_threshold=64, connectivity=1)
 
     return preprocessed_image
