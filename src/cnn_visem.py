@@ -26,7 +26,7 @@ def get_visem_cnn():
         Builds and compiles a Convolutional Neural Network (CNN) model for image classification.
 
         The model architecture includes:
-            - Input layer for 32x32 RGB images.
+            - Input layer for 48x48 RGB images.
             - Data augmentation layers: random flipping, translation, and zoom.
             - Rescaling layer to normalize pixel values.
             - Two convolutional blocks, each with Conv2D and MaxPool2D layers.
