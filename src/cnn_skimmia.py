@@ -34,7 +34,7 @@ def get_skimmia_cnn():
             - Three dense layers for feature extraction.
             - Output layers: a dense layer with 1 unit (sigmoid activation) for binary classification.
         The model is compiled with:
-            - Adam optimizer (learning rate: 0.0015)
+            - Adam optimizer (learning rate: 0.00015)
             - Binary crossentropy loss
             - Precision metric
             
@@ -98,7 +98,7 @@ def get_skimmia_cnn():
                       kernel_initializer='random_normal')
             ])
 
-    model.compile(optimizer=Adam(learning_rate=0.0015), 
+    model.compile(optimizer=Adam(learning_rate=0.00015), 
                   loss=BinaryCrossentropy(), 
                   metrics=[Precision(name="precision", thresholds=0.5),
                            Recall(name="recall", thresholds=0.5)])
