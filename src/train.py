@@ -28,9 +28,8 @@ from paths import (
 
 def main():
     warnings.filterwarnings("ignore")
-
-    #-------------------- LOADING SKIMMIA DATASET --------------------
     
+    #-------------------- LOADING SKIMMIA DATASET --------------------
     print('\n')
     print("Loading skimmia data... \n")
 
@@ -38,9 +37,13 @@ def main():
     print(f"Loaded {skimmia_images_train.shape[0]} training images from Skimmia dataset.") 
 
     skimmia_images_valid, skimmia_bboxes_valid = load_data(SKIMMIA_IMAGES_VALID, SKIMMIA_ANNOTATIONS_VALID)
+    skimmia_images_valid = skimmia_images_valid[:100]
+    skimmia_bboxes_valid = skimmia_bboxes_valid[:100]
     print(f"Loaded {skimmia_images_valid.shape[0]} validating images from Skimmia dataset.") 
 
     skimmia_images_test, skimmia_bboxes_test = load_data(SKIMMIA_IMAGES_TEST, SKIMMIA_ANNOTATIONS_TEST)
+    skimmia_images_test = skimmia_images_test[:100]
+    skimmia_bboxes_test = skimmia_bboxes_test[:100]
     print(f"Loaded {skimmia_images_test.shape[0]} testing images from Skimmia dataset.") 
     
     #-------------------- TRAINING HOG DETECTOR (SKIMMIA) --------------------
@@ -51,7 +54,7 @@ def main():
 
     hog_skimmia_detector.train(images=skimmia_images_train, 
                                annotations=skimmia_bboxes_train,
-                               max_neg_samples=20000)
+                               max_neg_samples=30000)
     
     hog_skimmia_detector.evaluate(images=skimmia_images_valid, 
                                   annotations=skimmia_bboxes_valid,
@@ -73,9 +76,9 @@ def main():
                                                                              pred_scores=hog_skimmia_pred_scores,
                                                                              nms_threshold=0.1)
                                        
-    plot_predictions(images=skimmia_images_test[:5],
-                     gt_bboxes=skimmia_bboxes_test[:5],
-                     pred_bboxes=hog_skimmia_selected_bboxes[:5],
+    plot_predictions(images=skimmia_images_test[:3],
+                     gt_bboxes=skimmia_bboxes_test[:3],
+                     pred_bboxes=hog_skimmia_selected_bboxes[:3],
                      name='hog_skimmia_images_predictions')
     
     #-------------------- TRAINING RCNN MODEL (SKIMMIA) --------------------
@@ -90,7 +93,7 @@ def main():
 
     rcnn_skimmia.train(images=skimmia_images_train,
                        annotations=skimmia_bboxes_train,
-                       max_neg_samples=20000,
+                       max_neg_samples=40000,
                        epochs=80)
     
     rcnn_skimmia.evaluate(images=skimmia_images_valid,
@@ -113,21 +116,24 @@ def main():
                                                                                pred_scores=rcnn_skimmia_pred_scores,
                                                                                nms_threshold=0.1)
 
-    plot_predictions(images=skimmia_images_test[:5],
-                     gt_bboxes=skimmia_bboxes_test[:5],
-                     pred_bboxes=rcnn_skimmia_selected_bboxes[:5],
+    plot_predictions(images=skimmia_images_test[:3],
+                     gt_bboxes=skimmia_bboxes_test[:3],
+                     pred_bboxes=rcnn_skimmia_selected_bboxes[:3],
                      name='rcnn_skimmia_images_predictions')
-
+    
     #-------------------- LOADING PREPROCESSED SKIMMIA IMAGES --------------------
     print('\n')
     print('Loading preprecessed skimmia images... \n')
 
     preprocessed_skimmia_images_train = np.array([preprocess_skimmia(image) for image in skimmia_images_train])
-    print(f"Loaded {preprocessed_skimmia_images_train.shape[0]} training images from Skimmia dataset.") 
+    print(f"Loaded {preprocessed_skimmia_images_train.shape[0]} preprocessed training images from Skimmia dataset.") 
+
     preprocessed_skimmia_images_valid = np.array([preprocess_skimmia(image) for image in skimmia_images_valid])
-    print(f"Loaded {preprocessed_skimmia_images_valid.shape[0]} validating images from Skimmia dataset.") 
+    print(f"Loaded {preprocessed_skimmia_images_valid.shape[0]} preprocessed validating images from Skimmia dataset.") 
+
     preprocessed_skimmia_images_test = np.array([preprocess_skimmia(image) for image in skimmia_images_test])
-    print(f"Loaded {preprocessed_skimmia_images_test.shape[0]} testing images from Skimmia dataset.") 
+    print(f"Loaded {preprocessed_skimmia_images_test.shape[0]} preprocessed testing images from Skimmia dataset.") 
+    
     
     #-------------------- TRAINING HOG DETECTOR (SKIMMIA PREPROCESSED) --------------------
     print('\n')
@@ -137,7 +143,7 @@ def main():
 
     hog_pre_skimmia_detector.train(images=preprocessed_skimmia_images_train, 
                                    annotations=skimmia_bboxes_train,
-                                   max_neg_samples=20000)
+                                   max_neg_samples=30000)
     
     hog_pre_skimmia_detector.evaluate(images=preprocessed_skimmia_images_valid, 
                                       annotations=skimmia_bboxes_valid,
@@ -159,24 +165,24 @@ def main():
                                                                                      pred_scores=hog_pre_skimmia_pred_scores,
                                                                                      nms_threshold=0.1)
                                        
-    plot_predictions(images=skimmia_images_test[:5],
-                     gt_bboxes=skimmia_bboxes_test[:5],
-                     pred_bboxes=hog_pre_skimmia_selected_bboxes[:5],
+    plot_predictions(images=skimmia_images_test[:3],
+                     gt_bboxes=skimmia_bboxes_test[:3],
+                     pred_bboxes=hog_pre_skimmia_selected_bboxes[:3],
                      name='hog_pre_skimmia_images_predictions')
-   
+    
     #-------------------- TRAINING RCNN MODEL (SKIMMIA PREPROCESSED) --------------------
     print('\n')
     print('-------------------- RCNN --------------------')
-
+    
     cnn_pre_skimmia = get_skimmia_cnn()
 
     rcnn_pre_skimmia = RCNN(resize=(96, 96),
                             cnn=cnn_pre_skimmia,
-                            name='rcnn_skimmia_preprocessed')
+                            name='rcnn_pre_skimmia')
 
     rcnn_pre_skimmia.train(images=preprocessed_skimmia_images_train,
                            annotations=skimmia_bboxes_train,
-                           max_neg_samples=20000,
+                           max_neg_samples=40000,
                            epochs=80)
     
     rcnn_pre_skimmia.evaluate(images=preprocessed_skimmia_images_valid,
@@ -199,9 +205,9 @@ def main():
                                                                                        pred_scores=rcnn_pre_skimmia_pred_scores,
                                                                                        nms_threshold=0.1)
 
-    plot_predictions(images=skimmia_images_test[:5],
-                     gt_bboxes=skimmia_bboxes_test[:5],
-                     pred_bboxes=rcnn_pre_skimmia_selected_bboxes[:5],
+    plot_predictions(images=skimmia_images_test[:3],
+                     gt_bboxes=skimmia_bboxes_test[:3],
+                     pred_bboxes=rcnn_pre_skimmia_selected_bboxes[:3],
                      name='rcnn_pre_skimmia_images_predictions')
     
     #-------------------- LOADING VISEM DATASET --------------------
@@ -212,23 +218,26 @@ def main():
     print(f"Loaded {visem_images_train.shape[0]} training images from Visem dataset.")
 
     visem_images_valid, visem_bboxes_valid = load_data(VISEM_IMAGES_VALID, VISEM_ANNOTATIONS_VALID)
+    visem_images_valid = visem_images_valid[:50]
+    visem_bboxes_valid = visem_bboxes_valid[:50]
     print(f"Loaded {visem_images_valid.shape[0]} validating images from Visem dataset.")
 
     visem_images_test, visem_bboxes_test = load_data(VISEM_IMAGES_TEST, VISEM_ANNOTATIONS_TEST)
+    visem_images_test = visem_images_test[:50]
+    visem_bboxes_test = visem_bboxes_test[:50]
     print(f"Loaded {visem_images_test.shape[0]} testing images from Visem dataset.")
-    
     
     #-------------------- TRAINING HOG DETECTOR (VISEM) --------------------
     print('\n')
     print('-------------------- HOG --------------------') 
 
     hog_visem_detector = HOG_Detector(base_window_size=(16,16), 
-                                      window_sizes=((8,8), (16,16), (32,32)),
+                                      window_sizes=((8,8), (16,16), (24,24), (32,32)),
                                       name='hog_visem')
 
     hog_visem_detector.train(images=visem_images_train, 
                              annotations=visem_bboxes_train,
-                             max_neg_samples=20000)
+                             max_neg_samples=30000)
     
     hog_visem_detector.evaluate(images=visem_images_valid, 
                                 annotations=visem_bboxes_valid,
@@ -250,9 +259,9 @@ def main():
                                                                          pred_scores=hog_visem_pred_scores,
                                                                          nms_threshold=0.1)
                                        
-    plot_predictions(images=visem_images_test[:5],
-                     gt_bboxes=visem_bboxes_test[:5],
-                     pred_bboxes=hog_visem_selected_bboxes[:5],
+    plot_predictions(images=visem_images_test[:3],
+                     gt_bboxes=visem_bboxes_test[:3],
+                     pred_bboxes=hog_visem_selected_bboxes[:3],
                      name='hog_visem_images_predictions')
     
     #-------------------- TRAINING RCNN MODEL (VISEM) --------------------
@@ -261,13 +270,13 @@ def main():
 
     cnn_visem = get_visem_cnn()
 
-    rcnn_visem = RCNN(resize=(48, 48),
+    rcnn_visem = RCNN(resize=(32, 32),
                       cnn=cnn_visem,
                       name='rcnn_visem')
 
     rcnn_visem.train(images=visem_images_train,
                      annotations=visem_bboxes_train,
-                     max_neg_samples=20000,
+                     max_neg_samples=40000,
                      epochs=80)
     
     rcnn_visem.evaluate(images=visem_images_valid,
@@ -290,9 +299,9 @@ def main():
                                                                            pred_scores=rcnn_visem_pred_scores,
                                                                            nms_threshold=0.1)
 
-    plot_predictions(images=visem_images_test[:5],
-                     gt_bboxes=visem_bboxes_test[:5],
-                     pred_bboxes=rcnn_visem_selected_bboxes[:5],
+    plot_predictions(images=visem_images_test[:3],
+                     gt_bboxes=visem_bboxes_test[:3],
+                     pred_bboxes=rcnn_visem_selected_bboxes[:3],
                      name='rcnn_visem_images_predictions')
     
     #-------------------- LOADING PREPROCESSED VISEM IMAGES --------------------
@@ -300,23 +309,24 @@ def main():
     print('Loading preprecessed visem images... \n')
 
     preprocessed_visem_images_train = np.array([preprocess_visem(image) for image in visem_images_train])
-    print(f"Loaded {preprocessed_visem_images_train.shape[0]} training images from Visem dataset.") 
+    print(f"Loaded {preprocessed_visem_images_train.shape[0]} preprocessed training images from Visem dataset.") 
     preprocessed_visem_images_valid = np.array([preprocess_visem(image) for image in visem_images_valid])
-    print(f"Loaded {preprocessed_visem_images_valid.shape[0]} validating images from Visem dataset.") 
+    print(f"Loaded {preprocessed_visem_images_valid.shape[0]} preprocessed validating images from Visem dataset.") 
     preprocessed_visem_images_test = np.array([preprocess_visem(image) for image in visem_images_test])
-    print(f"Loaded {preprocessed_visem_images_test.shape[0]} testing images from Visem dataset.") 
+    print(f"Loaded {preprocessed_visem_images_test.shape[0]} preprocessed testing images from Visem dataset.") 
+    
     
     #-------------------- TRAINING HOG DETECTOR (VISEM PREPROCESSED) --------------------
     print('\n')
     print('-------------------- HOG --------------------') 
 
     hog_pre_visem_detector = HOG_Detector(base_window_size=(16,16), 
-                                          window_sizes=((8,8), (16,16), (32,32)),
+                                          window_sizes=((8,8), (16,16), (24,24), (32,32)),
                                           name='hog_pre_visem')
 
     hog_pre_visem_detector.train(images=preprocessed_visem_images_train, 
                                  annotations=visem_bboxes_train,
-                                 max_neg_samples=20000)
+                                 max_neg_samples=30000)
     
     hog_pre_visem_detector.evaluate(images=preprocessed_visem_images_valid, 
                                     annotations=visem_bboxes_valid,
@@ -338,10 +348,11 @@ def main():
                                                                                  pred_scores=hog_pre_visem_pred_scores,
                                                                                  nms_threshold=0.1)
                                        
-    plot_predictions(images=visem_images_test[:5],
-                     gt_bboxes=visem_bboxes_test[:5],
-                     pred_bboxes=hog_pre_visem_selected_bboxes[:5],
+    plot_predictions(images=visem_images_test[:3],
+                     gt_bboxes=visem_bboxes_test[:3],
+                     pred_bboxes=hog_pre_visem_selected_bboxes[:3],
                      name='hog_pre_visem_images_predictions')
+    
     
     #-------------------- TRAINING RCNN MODEL (VISEM PREPROCESSED) --------------------
     print('\n')
@@ -349,13 +360,13 @@ def main():
 
     cnn_pre_visem = get_visem_cnn()
 
-    rcnn_pre_visem = RCNN(resize=(48, 48),
+    rcnn_pre_visem = RCNN(resize=(32, 32),
                       cnn=cnn_pre_visem,
                       name='rcnn_pre_visem')
 
     rcnn_pre_visem.train(images=preprocessed_visem_images_train,
                          annotations=visem_bboxes_train,
-                         max_neg_samples=20000,
+                         max_neg_samples=40000,
                          epochs=80)
     
     rcnn_pre_visem.evaluate(images=preprocessed_visem_images_valid,
@@ -378,10 +389,10 @@ def main():
                                                                                    pred_scores=rcnn_pre_visem_pred_scores,
                                                                                    nms_threshold=0.1)
 
-    plot_predictions(images=visem_images_test[:5],
-                     gt_bboxes=visem_bboxes_test[:5],
-                     pred_bboxes=rcnn_pre_visem_selected_bboxes[:5],
+    plot_predictions(images=visem_images_test[:3],
+                     gt_bboxes=visem_bboxes_test[:3],
+                     pred_bboxes=rcnn_pre_visem_selected_bboxes[:3],
                      name='rcnn_pre_visem_images_predictions')
-
+    
 if __name__ == '__main__':
     main()

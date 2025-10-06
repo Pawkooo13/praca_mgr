@@ -19,7 +19,7 @@ def load_data(images_dir, annotations_file):
     else:
         qry = "`image` == @img_name & `class_id` == 0"
 
-    image_files = set(os.listdir(images_dir))
+    image_files = set(os.listdir(images_dir)[:300])
 
     images = []
     bboxes = []
@@ -83,21 +83,31 @@ def IoU(box1, box2):
 def average_IoU(gt_bboxes, pred_bboxes):
     """
     Compute average IoU across given ground truth bboxes and predicted bboxes for images.
+    Returns a tuple of (average IoU by ground truth boxes, average IoU by predicted boxes).
     """
-    num_images = gt_bboxes.shape[0]
-    max_ious = []
+    num_images = len(pred_bboxes)
+    max_ious_by_gt = []
+    max_ious_by_pred = []
+   
     for i in range(num_images):
         gt_bboxes_per_img = gt_bboxes[i]
         pred_bboxes_per_img = pred_bboxes[i]
 
+        for gt_bbox in gt_bboxes_per_img:
+            ious = [IoU(box1=gt_bbox, box2=pred_bbox) for pred_bbox in pred_bboxes_per_img]
+            if len(ious) != 0:
+                max_ious_by_gt.append(np.max(ious))
+                #else:
+                #    max_ious.append(0)
+
         for pred_bbox in pred_bboxes_per_img:
             ious = [IoU(box1=gt_box, box2=pred_bbox) for gt_box in gt_bboxes_per_img]
             if len(ious) != 0:
-                max_ious.append(np.max(ious))
-            #else:
-            #    max_ious.append(0)
+                max_ious_by_pred.append(np.max(ious))
+                #else:
+                #    max_ious.append(0)
 
-    return np.average(max_ious)
+    return (np.average(max_ious_by_gt), np.average(max_ious_by_pred))
 
 def average_IoU_after_NMS(gt_bboxes, pred_bboxes, pred_scores, nms_threshold):
     """
@@ -132,7 +142,7 @@ def avg_IoU_after_NMS_with_given_tsh(gt_bboxes,
                                         pred_scores=pred_scores,
                                         nms_threshold=tsh)[0]
         
-        results[f'{tsh}'] = round(avg_iou, 2)
+        results[f'{tsh}'] = list(np.round(avg_iou, 2))
     
     print(results)
 
@@ -145,7 +155,7 @@ def plot_predictions(images, gt_bboxes, pred_bboxes, name):
     """
     Plot given bboxes on given images and save in plots directory.
     """
-    fig, ax = plt.subplots(1, len(images), figsize=(20, 10))
+    fig, ax = plt.subplots(1, len(images), figsize=(18, 12))
     
     for i, image in enumerate(images):
         
