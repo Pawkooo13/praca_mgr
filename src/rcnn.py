@@ -22,14 +22,18 @@ class RCNN:
             image: The input image for which to generate region proposals.
 
         Returns:
-            - rois_images: A list of ROI images resized to (64, 64, 3).
+            - rois_images: A list of ROI images resized to given shape.
             - rois_coordinates: A list of ROI coordinates, where each ROI is represented as [x, y, w, h].
         """
+        if len(image.shape) == 2 or image.shape[2] == 1:  
+            image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)*255
+            image = image.astype(np.uint8)
+
         ss = cv2.ximgproc.segmentation.createSelectiveSearchSegmentation()
         ss.setBaseImage(image)
-        ss.switchToSingleStrategy(k=200, sigma=0.8)
+        ss.switchToSelectiveSearchFast() #switchToSingleStrategy(k=200, sigma=0.8)
         rois_coordinates = ss.process()
-
+        
         # Preallocate output arrays for efficiency
         num_rois = len(rois_coordinates)
         img_w, img_h = self.resize
@@ -153,8 +157,8 @@ class RCNN:
 
         # Evaluate model
         loss, precision, recall = model.evaluate(x=X_img,
-                                         y=Y_img,
-                                         batch_size=64)
+                                                 y=Y_img,
+                                                 batch_size=32)
         ious = []
         for x_bbox, y_bbox in zip(X_bboxes, Y_bboxes):
             if np.all(y_bbox != 0):
@@ -214,14 +218,14 @@ class RCNN:
                            compile=True)
         loss, val_precision, val_recall = model.evaluate(x=np.array(X_imgs),
                                                          y=np.array(Y_imgs),
-                                                         batch_size=64,
+                                                         batch_size=16,
                                                          verbose=0)
 
         Y_pred = model.predict(np.array(X_imgs)).flatten()
         idxs = np.where(Y_pred >= pred_threshold)[0]
         avg_iou = np.average(np.array(IOUs)[idxs])
 
-        print(f"Evaluated precision: {val_precision*100:.2f}%, {val_recall*100:.2f}%, {avg_iou:.2f} avg. IoU")
+        print(f"Evaluated metrics: (Precision: {val_precision*100:.2f}%), (Recall: {val_recall*100:.2f}%), {avg_iou:.2f} avg. IoU")
 
     def predict(self, images, threshold):
         """
@@ -251,7 +255,7 @@ class RCNN:
 
             rois_imgs, rois_bboxes = self.get_ROIs(image=img) 
 
-            predictions = model.predict(rois_imgs).flatten()
+            predictions = model.predict(rois_imgs, batch_size=16).flatten()
             idxs = np.where(predictions >= threshold)[0]
 
             final_scores.append(predictions[idxs])

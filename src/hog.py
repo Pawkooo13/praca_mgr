@@ -44,7 +44,8 @@ class HOG_Detector:
 
         Retruns feature vectors for each block.
         """
-        image = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
+        if len(image.shape) == 3:
+            image = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
         
         hog_features = hog(image,
                            orientations=self.orientations,

@@ -63,12 +63,14 @@ def preprocess_visem(image):
     The function performs the following steps:
         1. Applies adaptive histogram equalization to enhance contrast.
         2. Applies morphological area closing to remove small dark regions (black noise) from the image.
+        3. Applies gamma correction to additionally reduce noise impact
     """
     img_gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
     img_adapteq = equalize_adapthist(img_gray, clip_limit=0.005)
-    preprocessed_image = area_closing(img_adapteq, area_threshold=64, connectivity=1)
+    img_ac = area_closing(img_adapteq, area_threshold=64, connectivity=1)
+    preprocessed_image = adjust_gamma(img_ac, 2)
 
-    return preprocessed_image
+    return preprocessed_image.astype(np.float32)
 
 def NMS(bboxes, scores, iou_threshold):
     """
